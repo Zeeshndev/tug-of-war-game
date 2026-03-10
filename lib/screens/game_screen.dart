@@ -16,18 +16,39 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   bool _wrongShake = false;
+  
+  // ── Combo Animation Controllers ──
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+  int _lastStreak = 0;
+  bool _showComboText = false;
+  String _comboMessage = "";
 
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_handleKey);
+
+    // Initialize the master screen shake controller
+    _shakeController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
+        
+    // A rapid back-and-forth shake sequence
+    _shakeAnimation = TweenSequence([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: -10.0), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -10.0, end: 10.0), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 10.0, end: -10.0), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: -10.0, end: 10.0), weight: 2),
+      TweenSequenceItem(tween: Tween(begin: 10.0, end: 0.0), weight: 1),
+    ]).animate(CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut));
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleKey);
+    _shakeController.dispose();
     super.dispose();
   }
 
@@ -53,109 +74,180 @@ class _GameScreenState extends ConsumerState<GameScreen>
     });
   }
 
+  // ── Trigger Combo Effects ──
+  void _triggerComboEffect(int streak) {
+    HapticFeedback.heavyImpact(); // Physical punch
+    _shakeController.forward(from: 0.0); // Screen shake
+
+    // Determine the hype text
+    if (streak == 3) _comboMessage = "COMBO 3!";
+    else if (streak == 5) _comboMessage = "SUPER PULL!";
+    else if (streak == 10) _comboMessage = "UNSTOPPABLE!";
+    else _comboMessage = "BOOM!";
+
+    setState(() => _showComboText = true);
+
+    // Hide text after 1 second
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) setState(() => _showComboText = false);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(gameProvider);
     final progress = ref.watch(progressProvider);
 
+    // Listen for state changes to trigger navigation OR combo animations
     ref.listen(gameProvider, (prev, next) {
       if (prev?.active == true && !next.active) {
         Future.microtask(() { if (mounted) context.go('/result'); });
+      }
+
+      // Check if a combo milestone was just hit
+      if (prev != null) {
+        if (next.sessionStreak == 3 && prev.sessionStreak == 2) _triggerComboEffect(3);
+        if (next.sessionStreak == 5 && prev.sessionStreak == 4) _triggerComboEffect(5);
+        if (next.sessionStreak == 10 && prev.sessionStreak == 9) _triggerComboEffect(10);
       }
     });
 
     final urgent = session.timeLeft <= 10;
 
+    // We wrap the entire Scaffold body in an AnimatedBuilder connected to the shake controller
     return Scaffold(
       backgroundColor: AppTheme.bg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // ── Top header ─────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-              child: Row(
+      body: AnimatedBuilder(
+        animation: _shakeAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(_shakeAnimation.value, 0), // Shakes left to right
+            child: child,
+          );
+        },
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Column(
                 children: [
-                  // Match timer
-                  _TimerBadge(seconds: session.timeLeft, urgent: urgent),
-                  const SizedBox(width: 8),
-                  // Streak
-                  _StreakBadge(streak: session.sessionStreak),
-                  const Spacer(),
-                  // Pause
-                  _PauseBtn(onTap: _pauseGame),
+                  // ── Top header ─────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                    child: Row(
+                      children: [
+                        _TimerBadge(seconds: session.timeLeft, urgent: urgent),
+                        const SizedBox(width: 8),
+                        _StreakBadge(streak: session.sessionStreak),
+                        const Spacer(),
+                        _PauseBtn(onTap: _pauseGame),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // ── Scores ─────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        _ScoreBadge(label: 'YOU', score: session.playerScore, color: AppTheme.blue),
+                        const Spacer(),
+                        Text('VS', style: AppTheme.display(16, color: AppTheme.textSecondary)),
+                        const Spacer(),
+                        _ScoreBadge(label: 'CPU', score: session.aiScore, color: AppTheme.red),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // ── Rope + Characters ───────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: RopeWidget(
+                      ropePosition: session.ropePosition,
+                      playerCharId: progress.selectedCharacter,
+                      ropeId: progress.selectedRope,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // ── AI panel ────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: AiFeedbackWidget(
+                      aiState: session.aiState,
+                      aiQuestion: session.aiQuestion,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // ── Player question + 7s timer ──────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: _PlayerQuestionArea(session: session),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // ── Answer display ──────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: _AnswerBox(
+                      input: session.currentInput,
+                      shake: _wrongShake,
+                      isCorrect: session.playerAnsweredCorrect,
+                      isWrong: session.playerAnsweredWrong,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+
+                  // ── Keypad ──────────────────────────────────
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                      child: _CompactKeypad(
+                        onDigit: (d) => ref.read(gameProvider.notifier).appendDigit(d),
+                        onDelete: () => ref.read(gameProvider.notifier).deleteDigit(),
+                        onSubmit: _submit,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 6),
-
-            // ── Scores ─────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                children: [
-                  _ScoreBadge(label: 'YOU', score: session.playerScore, color: AppTheme.blue),
-                  const Spacer(),
-                  Text('VS', style: AppTheme.display(16, color: AppTheme.textSecondary)),
-                  const Spacer(),
-                  _ScoreBadge(label: 'CPU', score: session.aiScore, color: AppTheme.red),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // ── Rope + Characters ───────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: RopeWidget(
-                ropePosition: session.ropePosition,
-                playerCharId: progress.selectedCharacter,
-                ropeId: progress.selectedRope,
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // ── AI panel (separate question + status) ───
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: AiFeedbackWidget(
-                aiState: session.aiState,
-                aiQuestion: session.aiQuestion,
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // ── Player question + 7s timer ──────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: _PlayerQuestionArea(session: session),
-            ),
-            const SizedBox(height: 6),
-
-            // ── Answer display ──────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: _AnswerBox(
-                input: session.currentInput,
-                shake: _wrongShake,
-                isCorrect: session.playerAnsweredCorrect,
-                isWrong: session.playerAnsweredWrong,
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // ── Keypad — fills remaining space, never overflows ──
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                child: _CompactKeypad(
-                  onDigit: (d) => ref.read(gameProvider.notifier).appendDigit(d),
-                  onDelete: () => ref.read(gameProvider.notifier).deleteDigit(),
-                  onSubmit: _submit,
+              
+              // ── DYNAMIC COMBO OVERLAY ──
+              if (_showComboText)
+                Center(
+                  child: TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0.5, end: 1.0),
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.elasticOut,
+                    builder: (context, scale, child) {
+                      return Transform.scale(
+                        scale: scale,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                          decoration: BoxDecoration(
+                            color: AppTheme.yellow,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.yellowLight.withOpacity(0.5),
+                                blurRadius: 20,
+                                spreadRadius: 5,
+                              )
+                            ]
+                          ),
+                          child: Text(
+                            _comboMessage,
+                            style: AppTheme.display(42, color: AppTheme.bg),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -297,7 +389,6 @@ class _PlayerQuestionArea extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Skill badge
                 if (q != null)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -309,13 +400,11 @@ class _PlayerQuestionArea extends StatelessWidget {
                         style: AppTheme.body(10, color: AppTheme.blueLight)),
                   ),
                 const SizedBox(height: 4),
-                // Question
                 Text(q?.displayText ?? '...', style: AppTheme.display(36)),
               ],
             ),
           ),
           const SizedBox(width: 10),
-          // 7s countdown ring
           SizedBox(
             width: 44, height: 44,
             child: Stack(alignment: Alignment.center, children: [
@@ -399,11 +488,10 @@ class _CompactKeypad extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use LayoutBuilder to fill exactly the available space
     return LayoutBuilder(
       builder: (context, constraints) {
         final h = constraints.maxHeight;
-        final rowH = (h - 18) / 4; // 4 rows, 6px gaps
+        final rowH = (h - 18) / 4; 
         return Column(
           children: [
             _row(['7','8','9'], rowH),
