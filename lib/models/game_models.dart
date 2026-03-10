@@ -33,15 +33,14 @@ extension MathSkillLabel on MathSkill {
   }
 }
 
-/// Which operations to include — user picks this in settings
 enum GameMode {
-  mixed,          // all operations
+  mixed,
   additionOnly,
   subtractionOnly,
   multiplicationOnly,
   divisionOnly,
-  addSubtract,    // addition + subtraction
-  multiplyDivide, // multiply + divide
+  addSubtract,
+  multiplyDivide,
 }
 
 extension GameModeLabel on GameMode {
@@ -184,7 +183,6 @@ class ShopItem {
       required this.price, required this.category, this.description});
 }
 
-// ── Characters — 12 total ─────────────────────────────────
 const List<ShopItem> kCharacters = [
   ShopItem(id: 'hero',      name: 'Hero',       emoji: '🦸', price: 0,    category: ShopCategory.character, description: 'The classic champion'),
   ShopItem(id: 'ninja',     name: 'Ninja',      emoji: '🥷', price: 150,  category: ShopCategory.character, description: 'Silent but deadly'),
@@ -200,7 +198,6 @@ const List<ShopItem> kCharacters = [
   ShopItem(id: 'dino',      name: 'Dino',       emoji: '🦕', price: 700,  category: ShopCategory.character, description: 'Prehistoric power'),
 ];
 
-// ── Ropes — 10 total ─────────────────────────────────────
 const List<ShopItem> kRopes = [
   ShopItem(id: 'classic',   name: 'Classic',    emoji: '🪢', price: 0,    category: ShopCategory.rope, description: 'Old faithful hemp rope'),
   ShopItem(id: 'fire',      name: 'Fire Rope',  emoji: '🔥', price: 200,  category: ShopCategory.rope, description: 'Burns with determination'),
@@ -213,8 +210,6 @@ const List<ShopItem> kRopes = [
   ShopItem(id: 'cosmic',    name: 'Cosmic',     emoji: '🌌', price: 650,  category: ShopCategory.rope, description: 'Made of starlight'),
   ShopItem(id: 'dragon',    name: 'Dragon Tail', emoji: '🐉', price: 800,  category: ShopCategory.rope, description: 'Legendary dragon rope'),
 ];
-
-// ── Added missing models below this line ────────────────────────────────────
 
 class Progress {
   int coins;
@@ -302,7 +297,7 @@ class LeaderboardEntry {
   String countryCode;
   int score;
   double accuracy;
-  int iqScore;
+  int brainPower; // CHANGED: Replaced IQ with Brain Power
   DateTime date;
 
   LeaderboardEntry({
@@ -310,7 +305,7 @@ class LeaderboardEntry {
     required this.countryCode,
     required this.score,
     required this.accuracy,
-    required this.iqScore,
+    required this.brainPower,
     required this.date,
   });
 }

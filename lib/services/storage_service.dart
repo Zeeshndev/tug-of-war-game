@@ -110,7 +110,8 @@ class StorageService {
         countryCode: j['countryCode'] ?? 'US',
         score: j['score'] ?? 0,
         accuracy: (j['accuracy'] ?? 0.0).toDouble(),
-        iqScore: j['iqScore'] ?? 100,
+        // BACKWARD COMPATIBILITY: Checks for new 'brainPower' key, falls back to old 'iqScore'
+        brainPower: j['brainPower'] ?? j['iqScore'] ?? 100, 
         date: DateTime.tryParse(j['date'] ?? '') ?? DateTime.now(),
       )).toList();
     } catch (_) { return _defaultLeaderboard(); }
@@ -119,31 +120,32 @@ class StorageService {
   static Future<void> addLeaderboardEntry(LeaderboardEntry entry) async {
     final board = getLeaderboard();
     board.add(entry);
-    // Sort by IQ score desc, keep top 100
-    board.sort((a, b) => b.iqScore.compareTo(a.iqScore));
+    
+    // Sort by Brain Power desc, keep top 100
+    board.sort((a, b) => b.brainPower.compareTo(a.brainPower));
     final trimmed = board.take(100).toList();
     
     await _p.setString('leaderboard', jsonEncode(trimmed.map((e) => {
       'playerName': e.playerName, 'countryCode': e.countryCode,
       'score': e.score, 'accuracy': e.accuracy,
-      'iqScore': e.iqScore, 'date': e.date.toIso8601String(),
+      'brainPower': e.brainPower, 'date': e.date.toIso8601String(),
     }).toList()));
   }
 
   static List<LeaderboardEntry> _defaultLeaderboard() {
-    // Realistic seed data from various countries
+    // Realistic seed data from various countries using new Brain Power logic
     final now = DateTime.now();
     return [
-      LeaderboardEntry(playerName: 'MathWiz', countryCode: 'US', score: 18, accuracy: 0.94, iqScore: 142, date: now.subtract(const Duration(days: 1))),
-      LeaderboardEntry(playerName: 'QuickCalc', countryCode: 'CN', score: 17, accuracy: 0.91, iqScore: 138, date: now.subtract(const Duration(days: 2))),
-      LeaderboardEntry(playerName: 'NumberKing', countryCode: 'IN', score: 16, accuracy: 0.89, iqScore: 135, date: now.subtract(const Duration(days: 3))),
-      LeaderboardEntry(playerName: 'BrainStorm', countryCode: 'GB', score: 15, accuracy: 0.87, iqScore: 131, date: now.subtract(const Duration(days: 4))),
-      LeaderboardEntry(playerName: 'TugMaster', countryCode: 'PK', score: 14, accuracy: 0.85, iqScore: 128, date: now.subtract(const Duration(days: 5))),
-      LeaderboardEntry(playerName: 'AlgebraAce', countryCode: 'DE', score: 14, accuracy: 0.83, iqScore: 126, date: now.subtract(const Duration(days: 6))),
-      LeaderboardEntry(playerName: 'SpeedMath', countryCode: 'JP', score: 13, accuracy: 0.81, iqScore: 122, date: now.subtract(const Duration(days: 7))),
-      LeaderboardEntry(playerName: 'PullPower', countryCode: 'AU', score: 12, accuracy: 0.78, iqScore: 118, date: now.subtract(const Duration(days: 8))),
-      LeaderboardEntry(playerName: 'CalcKid', countryCode: 'CA', score: 11, accuracy: 0.75, iqScore: 114, date: now.subtract(const Duration(days: 9))),
-      LeaderboardEntry(playerName: 'RopeRacer', countryCode: 'FR', score: 10, accuracy: 0.72, iqScore: 110, date: now.subtract(const Duration(days: 10))),
+      LeaderboardEntry(playerName: 'MathWiz', countryCode: 'US', score: 18, accuracy: 0.94, brainPower: 142, date: now.subtract(const Duration(days: 1))),
+      LeaderboardEntry(playerName: 'QuickCalc', countryCode: 'CN', score: 17, accuracy: 0.91, brainPower: 138, date: now.subtract(const Duration(days: 2))),
+      LeaderboardEntry(playerName: 'NumberKing', countryCode: 'IN', score: 16, accuracy: 0.89, brainPower: 135, date: now.subtract(const Duration(days: 3))),
+      LeaderboardEntry(playerName: 'BrainStorm', countryCode: 'GB', score: 15, accuracy: 0.87, brainPower: 131, date: now.subtract(const Duration(days: 4))),
+      LeaderboardEntry(playerName: 'TugMaster', countryCode: 'PK', score: 14, accuracy: 0.85, brainPower: 128, date: now.subtract(const Duration(days: 5))),
+      LeaderboardEntry(playerName: 'AlgebraAce', countryCode: 'DE', score: 14, accuracy: 0.83, brainPower: 126, date: now.subtract(const Duration(days: 6))),
+      LeaderboardEntry(playerName: 'SpeedMath', countryCode: 'JP', score: 13, accuracy: 0.81, brainPower: 122, date: now.subtract(const Duration(days: 7))),
+      LeaderboardEntry(playerName: 'PullPower', countryCode: 'AU', score: 12, accuracy: 0.78, brainPower: 118, date: now.subtract(const Duration(days: 8))),
+      LeaderboardEntry(playerName: 'CalcKid', countryCode: 'CA', score: 11, accuracy: 0.75, brainPower: 114, date: now.subtract(const Duration(days: 9))),
+      LeaderboardEntry(playerName: 'RopeRacer', countryCode: 'FR', score: 10, accuracy: 0.72, brainPower: 110, date: now.subtract(const Duration(days: 10))),
     ];
   }
 
@@ -155,7 +157,6 @@ class StorageService {
     if (last == null) {
       progress.streakDays = 1;
     } else {
-      // Calculate day difference ignoring specific hours
       final diff = DateTime(today.year, today.month, today.day)
           .difference(DateTime(last.year, last.month, last.day)).inDays;
       if (diff == 1) progress.streakDays += 1;
