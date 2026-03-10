@@ -25,6 +25,7 @@ class ProfileNotifier extends StateNotifier<Profile> {
   Future<void> setSound(bool on) async {
     AudioService().soundEnabled = on;
     final p = _copy(sound: on); await StorageService.saveProfile(p); state = p;
+    if (!on) AudioService().stopBgm();
   }
   Future<void> setVibration(bool on) async {
     final p = _copy(vib: on); await StorageService.saveProfile(p); state = p;
@@ -139,8 +140,6 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> setTimeLimit(int v) async {
     final s = _clone()..sessionTimeLimit = v; await _save(s);
   }
-  
-  // ADDED: This fixes the Parent Settings Screen error
   Future<void> toggleAds() async {
     final s = _clone()..adsEnabled = !state.adsEnabled; 
     await _save(s);
@@ -157,54 +156,28 @@ class LeaderboardNotifier extends StateNotifier<List<LeaderboardEntry>> {
     await StorageService.addLeaderboardEntry(entry);
     state = StorageService.getLeaderboard();
   }
-
   void refresh() {
     state = StorageService.getLeaderboard();
   }
 }
 final leaderboardProvider =
-    StateNotifierProvider<LeaderboardNotifier, List<LeaderboardEntry>>(
-        (_) => LeaderboardNotifier());
+    StateNotifierProvider<LeaderboardNotifier, List<LeaderboardEntry>>((_) => LeaderboardNotifier());
 
-// ── IQ Score calculator ──────────────────────────────────────────────────────
-/// Calculates an IQ-style score (80–160) from match stats
-/// Formula weights: accuracy 40%, speed 40%, streak 20%
-int calculateIQ({
-  required int correct,
-  required int answered,
-  required int bestStreak,
-  required int matchDuration,
-  required int totalResponseMs,
-  required int responsesCount,
+// ── Brain Power (Formerly IQ Score) calculator ───────────────────────────────
+int calculateBrainPower({
+  required int correct, required int answered, required int bestStreak,
+  required int matchDuration, required int totalResponseMs, required int responsesCount,
 }) {
   if (answered == 0) return 85;
-
-  // Accuracy component: 0–100 mapped to 0–1
   final acc = correct / answered;
-
-  // Speed component: average seconds per question (lower = better)
-  // Baseline: 7s = bad, 1s = perfect
   final avgSec = responsesCount == 0 ? 7.0 : totalResponseMs / responsesCount / 1000.0;
   final speedScore = (1.0 - ((avgSec - 1.0) / 6.0).clamp(0.0, 1.0));
-
-  // Streak component: bestStreak relative to total answered
   final streakScore = (bestStreak / max(1, answered)).clamp(0.0, 1.0);
-
-  // Weighted composite: 0..1
   final composite = acc * 0.45 + speedScore * 0.40 + streakScore * 0.15;
-
-  // Map to IQ range 80–160 (mean 100, genius 160)
-  final iq = (80 + composite * 80).round();
-  return iq.clamp(80, 160);
-}
-
-String iqLabel(int iq) {
-  if (iq >= 145) return 'Genius 🧠';
-  if (iq >= 130) return 'Gifted 🌟';
-  if (iq >= 120) return 'Superior ⭐';
-  if (iq >= 110) return 'Above Average 👍';
-  if (iq >= 90)  return 'Average 📊';
-  return 'Developing 📈';
+  
+  // Adjusted baseline for Brain Power (feels more like a power level)
+  final power = (80 + composite * 80).round();
+  return power.clamp(80, 160);
 }
 
 // ── Game ─────────────────────────────────────────────────────────────────────
@@ -223,6 +196,18 @@ class GameNotifier extends StateNotifier<GameSession> {
   int      get _dur  => _ref.read(settingsProvider).matchDuration;
   GameMode get _mode => _ref.read(settingsProvider).gameModeEnum;
 
+  void _evaluateMusic() {
+    if (!state.active || state.paused) return;
+    
+    if (state.ropePosition <= -4.0) {
+      AudioService().setBgmState(BgmState.winning);
+    } else if (state.ropePosition >= 4.0) {
+      AudioService().setBgmState(BgmState.losing);
+    } else {
+      AudioService().setBgmState(BgmState.normal);
+    }
+  }
+
   void startMatch() {
     _matchTimer?.cancel(); _questionTimer?.cancel(); _aiTimer?.cancel();
     _skillCorrect.clear();
@@ -239,7 +224,8 @@ class GameNotifier extends StateNotifier<GameSession> {
     _startMatchTimer();
     _startQuestionTimer();
     _scheduleAI();
-    AudioService().startTick();
+    
+    AudioService().setBgmState(BgmState.normal);
   }
 
   void _startMatchTimer() {
@@ -262,7 +248,6 @@ class GameNotifier extends StateNotifier<GameSession> {
       final qt = state.questionTimeLeft - 1;
       if (qt <= 0) {
         _questionTimer?.cancel();
-        // Timed out — count as answered wrong (penalty)
         _recordResponseTime(timedOut: true);
         state = state.copyWith(
           questionTimeLeft: 0,
@@ -271,6 +256,7 @@ class GameNotifier extends StateNotifier<GameSession> {
           ropePosition: min(10.0, state.ropePosition + 0.3),
           currentInput: '',
         );
+        _evaluateMusic();
         Future.delayed(const Duration(milliseconds: 400), _nextPlayerQuestion);
       } else {
         state = state.copyWith(questionTimeLeft: qt);
@@ -336,12 +322,23 @@ class GameNotifier extends StateNotifier<GameSession> {
   void _playerCorrect(MathQuestion q) {
     _questionTimer?.cancel();
     _recordResponseTime();
+    
     final streak = state.sessionStreak + 1;
     final best   = max(streak, state.sessionBestStreak);
-    final pull   = 1.5 + (streak >= 3 ? 0.5 : 0.0);
-    final rope   = max(-10.0, state.ropePosition - pull);
-    final coins  = 2 + (streak >= 3 ? 1 : 0);
+    
+    // COMBO MULTIPLIER LOGIC
+    // The higher the streak, the harder the rope pulls!
+    final pull = 1.5 + (streak >= 10 ? 1.5 : (streak >= 5 ? 1.0 : (streak >= 3 ? 0.5 : 0.0)));
+    final rope = max(-10.0, state.ropePosition - pull);
+    
+    // Bonus coins for hitting streak milestones
+    int coins = 2;
+    if (streak == 3) coins += 2;
+    if (streak == 5) coins += 5;
+    if (streak == 10) coins += 10;
+
     _skillCorrect[q.skill] = (_skillCorrect[q.skill] ?? 0) + 1;
+    
     state = state.copyWith(
       playerScore: state.playerScore + 1,
       sessionStreak: streak, sessionBestStreak: best,
@@ -350,7 +347,10 @@ class GameNotifier extends StateNotifier<GameSession> {
       ropePosition: rope, coinsEarned: state.coinsEarned + coins,
       currentInput: '', playerAnsweredCorrect: true, playerAnsweredWrong: false,
     );
+    
     AudioService().playCorrect();
+    _evaluateMusic();
+    
     if (state.playerWinningByRope) { _endMatch(_R.ropePlayer); return; }
     Future.delayed(const Duration(milliseconds: 400), _nextPlayerQuestion);
   }
@@ -363,6 +363,8 @@ class GameNotifier extends StateNotifier<GameSession> {
       currentInput: '', playerAnsweredCorrect: false, playerAnsweredWrong: true,
     );
     AudioService().playWrong();
+    _evaluateMusic();
+    
     Future.delayed(const Duration(milliseconds: 500), () {
       if (state.active) state = state.copyWith(playerAnsweredWrong: false);
     });
@@ -392,6 +394,8 @@ class GameNotifier extends StateNotifier<GameSession> {
           wasCorrect: true, aiQuestion: q.displayText),
     );
     AudioService().playAiCorrect();
+    _evaluateMusic();
+    
     if (state.aiWinningByRope) { _endMatch(_R.ropeAi); return; }
     Future.delayed(const Duration(milliseconds: 800), _nextAiQuestion);
   }
@@ -425,14 +429,13 @@ class GameNotifier extends StateNotifier<GameSession> {
 
   void forceEnd() {
     _matchTimer?.cancel(); _questionTimer?.cancel(); _aiTimer?.cancel();
-    AudioService().stopTick();
+    AudioService().stopBgm();
     state = state.copyWith(active: false);
   }
 
   void _endMatch(_R reason) {
     if (!state.active) return;
     _matchTimer?.cancel(); _questionTimer?.cancel(); _aiTimer?.cancel();
-    AudioService().stopTick();
 
     MatchOutcome out;
     if (reason == _R.ropePlayer)      out = MatchOutcome.win;
@@ -444,52 +447,47 @@ class GameNotifier extends StateNotifier<GameSession> {
     }
 
     final bonus = out == MatchOutcome.win ? 15 : out == MatchOutcome.draw ? 5 : 0;
-    if (out == MatchOutcome.win)   AudioService().playWin();
-    else if (out == MatchOutcome.lose) AudioService().playLose();
+    
+    if (out == MatchOutcome.win) {
+      AudioService().playWin();
+    } else if (out == MatchOutcome.lose) {
+      AudioService().playLose();
+    } else {
+      AudioService().stopBgm();
+    }
 
     final coins = state.coinsEarned + bonus;
-
-    // Calculate IQ for this session
-    final iq = calculateIQ(
-      correct: state.sessionCorrect,
-      answered: state.sessionAnswered,
-      bestStreak: state.sessionBestStreak,
-      matchDuration: _dur,
-      totalResponseMs: _sessionResponseMs,
-      responsesCount: _sessionResponseCount,
+    
+    // RENAMED TO BRAIN POWER
+    final power = calculateBrainPower(
+      correct: state.sessionCorrect, answered: state.sessionAnswered,
+      bestStreak: state.sessionBestStreak, matchDuration: _dur,
+      totalResponseMs: _sessionResponseMs, responsesCount: _sessionResponseCount,
     );
 
     state = state.copyWith(active: false, coinsEarned: coins);
-
     final profile = _ref.read(profileProvider);
 
     _ref.read(progressProvider.notifier).recordMatchResult(
-      won: out == MatchOutcome.win,
-      sessionCorrect: state.sessionCorrect,
-      sessionAnswered: state.sessionAnswered,
-      sessionBestStreak: state.sessionBestStreak,
-      coinsEarned: coins,
-      skillCorrect: Map.from(_skillCorrect),
-      sessionScore: state.playerScore,
-      totalResponseMs: _sessionResponseMs,
+      won: out == MatchOutcome.win, sessionCorrect: state.sessionCorrect,
+      sessionAnswered: state.sessionAnswered, sessionBestStreak: state.sessionBestStreak,
+      coinsEarned: coins, skillCorrect: Map.from(_skillCorrect),
+      sessionScore: state.playerScore, totalResponseMs: _sessionResponseMs,
       responsesCount: _sessionResponseCount,
     );
 
-    // Add to leaderboard
     _ref.read(leaderboardProvider.notifier).addEntry(LeaderboardEntry(
-      playerName: profile.playerName,
-      countryCode: profile.countryCode,
+      playerName: profile.playerName, countryCode: profile.countryCode,
       score: state.playerScore,
       accuracy: state.sessionAnswered == 0 ? 0 : state.sessionCorrect / state.sessionAnswered,
-      iqScore: iq,
-      date: DateTime.now(),
+      brainPower: power, date: DateTime.now(), // CHANGED to Brain Power
     ));
   }
 
   @override
   void dispose() {
     _matchTimer?.cancel(); _questionTimer?.cancel(); _aiTimer?.cancel();
-    AudioService().stopTick();
+    AudioService().stopBgm();
     super.dispose();
   }
 }
