@@ -1,7 +1,6 @@
 import 'package:just_audio/just_audio.dart';
 
-// Added resultWin and resultLose to the state machine
-enum BgmState { menu, normal, winning, losing, resultWin, resultLose, stopped }
+enum BgmState { menu, normal, boss, winning, losing, resultWin, resultLose, stopped }
 
 class AudioService {
   static final AudioService _instance = AudioService._internal();
@@ -20,6 +19,8 @@ class AudioService {
   final String _urlLosing = 'https://res.cloudinary.com/dxtegwucd/video/upload/v1773104438/bgm_losing_q4p2cx.mp3';
   final String _urlWinSfx = 'https://res.cloudinary.com/dxtegwucd/video/upload/v1773104438/win_ojnrsr.mp3';
   final String _urlLoseSfx = 'https://res.cloudinary.com/dxtegwucd/video/upload/v1773104438/lose_egww5f.mp3';
+  // Fast, intense track for the Boss Battles (Currently reusing winning track as a placeholder)
+  final String _urlBoss = 'https://res.cloudinary.com/dxtegwucd/video/upload/v1773104438/bgm_winning_ykxe0d.mp3'; 
 
   // ── Background Music Logic ───────────────────────────────────────────────
   
@@ -36,6 +37,9 @@ class AudioService {
         break;
       case BgmState.normal:
         url = _urlNormal;
+        break;
+      case BgmState.boss:
+        url = _urlBoss;
         break;
       case BgmState.winning:
         url = _urlWinning;
@@ -68,8 +72,6 @@ class AudioService {
   }
 
   // ── Sound Effects Logic ──────────────────────────────────────────────────
-  
-  // For quick, local UI sounds, keeping them local is best to avoid UI lag.
   Future<void> _playLocalSfx(String path) async {
     if (!soundEnabled) return;
     try {
@@ -92,7 +94,6 @@ class AudioService {
   void playAiCorrect() => _playLocalSfx('assets/audio/ai_correct.mp3'); 
   void playAiWrong() => _playLocalSfx('assets/audio/ai_wrong.mp3');     
   
-  // These now tap into the BGM state machine so they can be interrupted!
   void playWin() => setBgmState(BgmState.resultWin);
   void playLose() => setBgmState(BgmState.resultLose);
 
@@ -103,5 +104,4 @@ class AudioService {
       _bgmPlayer.play();
     }
   }
-  void stopTick() => stopBgm(); 
 }

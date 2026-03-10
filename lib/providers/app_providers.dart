@@ -6,6 +6,13 @@ import '../services/storage_service.dart';
 import '../services/question_engine.dart';
 import '../services/audio_service.dart';
 
+// ── Match Configuration ──────────────────────────────────────────────────────
+final matchConfigProvider = StateProvider<Map<String, dynamic>>((ref) => {
+  'isAdventure': false, 
+  'level': 0, 
+  'isBoss': false
+});
+
 // ── Profile ─────────────────────────────────────────────────────────────────
 class ProfileNotifier extends StateNotifier<Profile> {
   ProfileNotifier() : super(StorageService.getProfile());
@@ -88,8 +95,8 @@ class ProgressNotifier extends StateNotifier<Progress> {
     p.subtractionCorrect    += skillCorrect[MathSkill.subtraction] ?? 0;
     p.multiplicationCorrect += skillCorrect[MathSkill.multiplication] ?? 0;
     p.divisionCorrect       += skillCorrect[MathSkill.division] ?? 0;
-    p.totalResponseTimeMs       += totalResponseMs;
-    p.totalQuestionsAnswered    += responsesCount;
+    p.totalResponseTimeMs   += totalResponseMs;
+    p.totalQuestionsAnswered += responsesCount;
     await _save(p);
   }
 
@@ -163,7 +170,7 @@ class LeaderboardNotifier extends StateNotifier<List<LeaderboardEntry>> {
 final leaderboardProvider =
     StateNotifierProvider<LeaderboardNotifier, List<LeaderboardEntry>>((_) => LeaderboardNotifier());
 
-// ── Brain Power (Formerly IQ Score) calculator ───────────────────────────────
+// ── Brain Power calculator ───────────────────────────────
 int calculateBrainPower({
   required int correct, required int answered, required int bestStreak,
   required int matchDuration, required int totalResponseMs, required int responsesCount,
@@ -175,7 +182,6 @@ int calculateBrainPower({
   final streakScore = (bestStreak / max(1, answered)).clamp(0.0, 1.0);
   final composite = acc * 0.45 + speedScore * 0.40 + streakScore * 0.15;
   
-  // Adjusted baseline for Brain Power (feels more like a power level)
   final power = (80 + composite * 80).round();
   return power.clamp(80, 160);
 }
@@ -199,6 +205,13 @@ class GameNotifier extends StateNotifier<GameSession> {
   void _evaluateMusic() {
     if (!state.active || state.paused) return;
     
+    // Boss music overrides dynamic pulling music
+    final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
+    if (isBoss) {
+      AudioService().setBgmState(BgmState.boss);
+      return;
+    }
+
     if (state.ropePosition <= -4.0) {
       AudioService().setBgmState(BgmState.winning);
     } else if (state.ropePosition >= 4.0) {
@@ -225,7 +238,9 @@ class GameNotifier extends StateNotifier<GameSession> {
     _startQuestionTimer();
     _scheduleAI();
     
-    AudioService().setBgmState(BgmState.normal);
+    // TRIGGER EPIC BOSS MUSIC IF APPLICABLE
+    final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
+    AudioService().setBgmState(isBoss ? BgmState.boss : BgmState.normal);
   }
 
   void _startMatchTimer() {
@@ -327,11 +342,9 @@ class GameNotifier extends StateNotifier<GameSession> {
     final best   = max(streak, state.sessionBestStreak);
     
     // COMBO MULTIPLIER LOGIC
-    // The higher the streak, the harder the rope pulls!
     final pull = 1.5 + (streak >= 10 ? 1.5 : (streak >= 5 ? 1.0 : (streak >= 3 ? 0.5 : 0.0)));
     final rope = max(-10.0, state.ropePosition - pull);
     
-    // Bonus coins for hitting streak milestones
     int coins = 2;
     if (streak == 3) coins += 2;
     if (streak == 5) coins += 5;
@@ -373,9 +386,19 @@ class GameNotifier extends StateNotifier<GameSession> {
   void _scheduleAI() {
     _aiTimer?.cancel();
     if (!state.active || state.paused) return;
-    final minMs = _age == 'A' ? 2000 : 1200;
-    final maxMs = _age == 'A' ? 5000 : 3500;
-    final acc   = _age == 'A' ? 0.70 : 0.80;
+    
+    int minMs = _age == 'A' ? 2000 : 1200;
+    int maxMs = _age == 'A' ? 5000 : 3500;
+    double acc = _age == 'A' ? 0.70 : 0.80;
+
+    // THE BOSS IS FASTER AND SMARTER
+    final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
+    if (isBoss) {
+      minMs = (minMs * 0.6).round(); // 40% Faster reaction
+      maxMs = (maxMs * 0.6).round();
+      acc = min(0.95, acc + 0.15);   // 15% More accurate
+    }
+
     _aiTimer = Timer(
       Duration(milliseconds: minMs + _rng.nextInt(maxMs - minMs)), () {
       if (!state.active || state.paused) return;
@@ -446,7 +469,9 @@ class GameNotifier extends StateNotifier<GameSession> {
           : MatchOutcome.draw;
     }
 
-    final bonus = out == MatchOutcome.win ? 15 : out == MatchOutcome.draw ? 5 : 0;
+    // MASSIVE COIN PAYOUT FOR BEATING BOSSES
+    final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
+    final bonus = out == MatchOutcome.win ? (isBoss ? 50 : 15) : out == MatchOutcome.draw ? 5 : 0;
     
     if (out == MatchOutcome.win) {
       AudioService().playWin();
@@ -458,7 +483,6 @@ class GameNotifier extends StateNotifier<GameSession> {
 
     final coins = state.coinsEarned + bonus;
     
-    // RENAMED TO BRAIN POWER
     final power = calculateBrainPower(
       correct: state.sessionCorrect, answered: state.sessionAnswered,
       bestStreak: state.sessionBestStreak, matchDuration: _dur,
@@ -480,7 +504,7 @@ class GameNotifier extends StateNotifier<GameSession> {
       playerName: profile.playerName, countryCode: profile.countryCode,
       score: state.playerScore,
       accuracy: state.sessionAnswered == 0 ? 0 : state.sessionCorrect / state.sessionAnswered,
-      brainPower: power, date: DateTime.now(), // CHANGED to Brain Power
+      brainPower: power, date: DateTime.now(),
     ));
   }
 

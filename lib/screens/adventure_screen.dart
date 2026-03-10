@@ -39,7 +39,7 @@ class AdventureScreen extends ConsumerWidget {
               ]),
             ),
 
-            // ── World Map List (Reversed so they climb UP) ──
+            // ── World Map List ────────────────────────
             Expanded(
               child: ListView.builder(
                 reverse: true, // Start at the bottom!
@@ -47,13 +47,11 @@ class AdventureScreen extends ConsumerWidget {
                 itemCount: _totalLevels,
                 itemBuilder: (context, index) {
                   final level = index + 1;
-                  // Formula: Need (level-1) * 2 wins to unlock the next level
                   final winsNeeded = (level - 1) * 2;
                   final isUnlocked = totalWins >= winsNeeded;
                   final isCurrent = isUnlocked && totalWins < (level * 2);
-                  final isBoss = level % 5 == 0; // Every 5th level is a boss!
+                  final isBoss = level % 5 == 0; 
 
-                  // Winding path math: alternates left, center, right, center
                   final alignOffset = (index % 4 == 0) ? 0.0 
                                     : (index % 4 == 1) ? 0.4 
                                     : (index % 4 == 2) ? 0.0 
@@ -68,7 +66,12 @@ class AdventureScreen extends ConsumerWidget {
                     winsNeeded: winsNeeded,
                     onTap: () {
                       if (!isUnlocked) return;
-                      // Instantly jump into a game
+                      // Tell the engine we are playing a map level
+                      ref.read(matchConfigProvider.notifier).state = {
+                        'isAdventure': true,
+                        'level': level,
+                        'isBoss': isBoss
+                      };
                       AudioService().setBgmState(BgmState.menu);
                       context.push('/countdown');
                     },
@@ -96,7 +99,6 @@ class _MapNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Styling based on state
     Color nodeColor = isCurrent ? AppTheme.yellow 
                     : isUnlocked ? AppTheme.green 
                     : AppTheme.bg3;
@@ -105,13 +107,12 @@ class _MapNode extends StatelessWidget {
     if (isCurrent && !isBoss) icon = '📍';
 
     return Container(
-      height: 110, // Gives space for the path connecting them
+      height: 110,
       alignment: Alignment(alignOffset, 0),
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          // Path Line to next node (don't draw on the very top node)
           if (level < 20)
             Positioned(
               top: -55, 
@@ -124,7 +125,6 @@ class _MapNode extends StatelessWidget {
               ),
             ),
           
-          // The Node Button
           GestureDetector(
             onTap: onTap,
             child: AnimatedContainer(
@@ -145,7 +145,6 @@ class _MapNode extends StatelessWidget {
             ),
           ),
 
-          // Level Label
           Positioned(
             bottom: -22,
             child: Text(
@@ -154,7 +153,6 @@ class _MapNode extends StatelessWidget {
             ),
           ),
           
-          // Unlock Requirement Overlay
           if (!isUnlocked)
             Positioned(
               top: -25,

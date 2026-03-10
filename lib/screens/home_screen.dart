@@ -79,7 +79,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Streak bar
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -104,7 +103,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Character display
                 AppCard(
                   child: Column(
                     children: [
@@ -117,7 +115,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Stats grid
                 GridView.count(
                   crossAxisCount: 2, shrinkWrap: true, crossAxisSpacing: 12, mainAxisSpacing: 12,
                   childAspectRatio: 1.4, physics: const NeverScrollableScrollPhysics(),
@@ -130,22 +127,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── PLAY BUTTONS ──
                 BigButton(
                   label: '🗺️ Adventure Mode',
                   onTap: () => context.push('/adventure'),
                   color: AppTheme.blue,
-                  shadowColor: const Color(0xFF1D4ED8), // Dark blue shadow
+                  shadowColor: const Color(0xFF1D4ED8), 
                   fontSize: 24,
                 ),
                 const SizedBox(height: 10),
                 GhostButton(
                   label: '⚡ Quick Play',
-                  onTap: () => context.push('/countdown'),
+                  onTap: () {
+                    // Turn off Boss mode for Quick Play
+                    ref.read(matchConfigProvider.notifier).state = {
+                      'isAdventure': false,
+                      'level': 0,
+                      'isBoss': false
+                    };
+                    context.push('/countdown');
+                  }
                 ),
                 const SizedBox(height: 20),
 
-                // Nav row
                 Row(
                   children: [
                     _NavBtn(emoji: '📊', label: 'Progress', onTap: () => context.push('/progress')),
