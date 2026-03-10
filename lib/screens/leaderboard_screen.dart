@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/game_models.dart'; // ADDED: This fixes the missing LeaderboardEntry error
+import '../models/game_models.dart'; 
 import '../providers/app_providers.dart';
 import '../services/storage_service.dart';
 import '../utils/theme.dart';
@@ -109,7 +109,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               const SizedBox(width: 38),
               Expanded(child: Text('PLAYER', style: AppTheme.body(10,
                   color: AppTheme.textSecondary, weight: FontWeight.w800))),
-              _hdr('IQ',    54),
+              _hdr('PWR',   54), // CHANGED from IQ to PWR
               _hdr('SCORE', 54),
               _hdr('ACC',   48),
             ]),
@@ -149,7 +149,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     for (var i = 0; i < top.length; i++) {
       final e = top[i];
       sb.writeln('${i+1}. ${_flag(e.countryCode)} ${e.playerName}'
-          '  IQ:${e.iqScore}  Score:${e.score}  ${(e.accuracy*100).round()}%');
+          '  PWR:${e.brainPower}  Score:${e.score}  ${(e.accuracy*100).round()}%'); // CHANGED
     }
     sb.writeln('━━━━━━━━━━━━━━━━');
     sb.write('Play: tugofwar.math 🎮');
@@ -181,9 +181,9 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final medal = rank == 1 ? '🥇' : rank == 2 ? '🥈' : rank == 3 ? '🥉' : '#$rank';
-    final iqCol = entry.iqScore >= 130 ? AppTheme.yellowLight
-                : entry.iqScore >= 110 ? AppTheme.greenLight
-                : AppTheme.blueLight;
+    final powerCol = entry.brainPower >= 130 ? AppTheme.yellowLight
+                   : entry.brainPower >= 110 ? AppTheme.greenLight
+                   : AppTheme.blueLight;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -218,11 +218,11 @@ class _Row extends StatelessWidget {
               ),
             ],
           ]),
-          Text(_iqLabel(entry.iqScore),
+          Text(_powerLabel(entry.brainPower),
               style: AppTheme.body(10, color: AppTheme.textSecondary)),
         ])),
-        SizedBox(width: 54, child: Center(child: Text('${entry.iqScore}',
-            style: AppTheme.body(14, color: iqCol, weight: FontWeight.w800)))),
+        SizedBox(width: 54, child: Center(child: Text('${entry.brainPower}',
+            style: AppTheme.body(14, color: powerCol, weight: FontWeight.w800)))),
         SizedBox(width: 54, child: Center(child: Text('${entry.score}',
             style: AppTheme.body(14, color: AppTheme.textPrimary, weight: FontWeight.w700)))),
         SizedBox(width: 48, child: Center(child: Text(
@@ -232,13 +232,13 @@ class _Row extends StatelessWidget {
     );
   }
 
-  String _iqLabel(int iq) {
-    if (iq >= 145) return 'Genius 🧠';
-    if (iq >= 130) return 'Gifted 🌟';
-    if (iq >= 120) return 'Superior ⭐';
-    if (iq >= 110) return 'Above Avg 👍';
-    if (iq >= 90)  return 'Average 📊';
-    return 'Developing 📈';
+  String _powerLabel(int pwr) {
+    if (pwr >= 145) return 'Legendary 👑';
+    if (pwr >= 130) return 'Epic 🌟';
+    if (pwr >= 120) return 'Super ⚡';
+    if (pwr >= 110) return 'Strong 💪';
+    if (pwr >= 90)  return 'Solid 📊';
+    return 'Growing 🌱';
   }
 
   String _flag(String code) {

@@ -7,7 +7,7 @@ import '../providers/app_providers.dart';
 import '../models/game_models.dart';
 import '../utils/theme.dart';
 import '../widgets/common_widgets.dart';
-import '../services/audio_service.dart'; // ADDED: Import the audio service
+import '../services/audio_service.dart';
 
 class ResultScreen extends ConsumerStatefulWidget {
   const ResultScreen({super.key});
@@ -17,7 +17,7 @@ class ResultScreen extends ConsumerStatefulWidget {
 
 class _ResultScreenState extends ConsumerState<ResultScreen> {
   late ConfettiController _confetti;
-  int _iq = 100;
+  int _brainPower = 100;
 
   @override
   void initState() {
@@ -27,7 +27,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
       final s   = ref.read(gameProvider);
       final dur = ref.read(settingsProvider).matchDuration;
       final prog= ref.read(progressProvider);
-      final iq  = calculateIQ(
+      final power  = calculateBrainPower(
         correct:         s.sessionCorrect,
         answered:        s.sessionAnswered,
         bestStreak:      s.sessionBestStreak,
@@ -35,7 +35,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
         totalResponseMs: prog.totalResponseTimeMs,
         responsesCount:  prog.totalQuestionsAnswered,
       );
-      setState(() => _iq = iq);
+      setState(() => _brainPower = power);
       if (_outcome(s) == MatchOutcome.win) _confetti.play();
     });
   }
@@ -96,8 +96,8 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                   style: AppTheme.body(13, color: AppTheme.textSecondary)),
               const SizedBox(height: 18),
 
-              // ── IQ Card ──────────────────────────────────────────────
-              _IqCard(iq: _iq),
+              // ── Brain Power Card ─────────────────────────────────────
+              _BrainPowerCard(power: _brainPower),
               const SizedBox(height: 12),
 
               // ── Score row ────────────────────────────────────────────
@@ -154,7 +154,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
               // ── Share card ─────────────────────────────────────────────
               _ShareCard(
-                outcome: outcome, iq: _iq, accPct: accPct,
+                outcome: outcome, power: _brainPower, accPct: accPct,
                 score: s.playerScore, streak: s.sessionBestStreak, cpm: cpm,
                 playerName: profile.playerName, countryCode: profile.countryCode,
               ),
@@ -164,7 +164,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
               BigButton(
                 label: '🔄 Play Again',
                 onTap: () {
-                  // RESET TO GENERIC MENU MUSIC BEFORE LEAVING THE SCREEN
                   AudioService().setBgmState(BgmState.menu);
                   context.go('/countdown');
                 },
@@ -176,7 +175,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                 Expanded(child: GhostButton(
                     label: '🏆 Leaderboard',
                     onTap: () {
-                      // RESET TO GENERIC MENU MUSIC BEFORE LEAVING THE SCREEN
                       AudioService().setBgmState(BgmState.menu);
                       context.push('/leaderboard');
                     })),
@@ -184,7 +182,6 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
                 Expanded(child: GhostButton(
                     label: '🏠 Home',
                     onTap: () {
-                      // RESET TO GENERIC MENU MUSIC BEFORE LEAVING THE SCREEN
                       AudioService().setBgmState(BgmState.menu);
                       context.go('/home');
                     })),
@@ -204,17 +201,17 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
   }
 }
 
-// ── IQ Card ──────────────────────────────────────────────────────────────────
-class _IqCard extends StatelessWidget {
-  final int iq;
-  const _IqCard({required this.iq});
+// ── Brain Power Card ─────────────────────────────────────────────────────────
+class _BrainPowerCard extends StatelessWidget {
+  final int power;
+  const _BrainPowerCard({required this.power});
 
   @override
   Widget build(BuildContext context) {
-    final col = iq >= 130 ? AppTheme.yellowLight
-              : iq >= 110 ? AppTheme.greenLight
+    final col = power >= 130 ? AppTheme.yellowLight
+              : power >= 110 ? AppTheme.greenLight
               : AppTheme.blueLight;
-    final label = _label(iq);
+    final label = _label(power);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -230,35 +227,35 @@ class _IqCard extends StatelessWidget {
         const Text('🧠', style: TextStyle(fontSize: 46)),
         const SizedBox(width: 16),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('MATH IQ SCORE', style: AppTheme.body(10, color: col, weight: FontWeight.w900)),
-          Text('$iq', style: AppTheme.display(54, color: col)),
+          Text('BRAIN POWER', style: AppTheme.body(10, color: col, weight: FontWeight.w900)),
+          Text('$power', style: AppTheme.display(54, color: col)),
           Text(label, style: AppTheme.body(13, color: col.withOpacity(0.85))),
         ])),
         Column(children: [
-          _IqBar(iq: iq),
+          _PowerBar(power: power),
           const SizedBox(height: 4),
-          Text('80 – 160', style: AppTheme.body(9, color: AppTheme.textSecondary)),
+          Text('Max: 160', style: AppTheme.body(9, color: AppTheme.textSecondary)),
         ]),
       ]),
     );
   }
 
-  String _label(int iq) {
-    if (iq >= 145) return 'Genius 🧠';
-    if (iq >= 130) return 'Gifted 🌟';
-    if (iq >= 120) return 'Superior ⭐';
-    if (iq >= 110) return 'Above Average 👍';
-    if (iq >= 90)  return 'Average 📊';
-    return 'Developing 📈';
+  String _label(int pwr) {
+    if (pwr >= 145) return 'Legendary 👑';
+    if (pwr >= 130) return 'Epic 🌟';
+    if (pwr >= 120) return 'Super ⚡';
+    if (pwr >= 110) return 'Strong 💪';
+    if (pwr >= 90)  return 'Solid 📊';
+    return 'Growing 🌱';
   }
 }
 
-class _IqBar extends StatelessWidget {
-  final int iq;
-  const _IqBar({required this.iq});
+class _PowerBar extends StatelessWidget {
+  final int power;
+  const _PowerBar({required this.power});
   @override
   Widget build(BuildContext context) {
-    final pct = ((iq - 80) / 80.0).clamp(0.0, 1.0);
+    final pct = ((power - 80) / 80.0).clamp(0.0, 1.0);
     return SizedBox(width: 64, height: 10, child: Stack(children: [
       Container(decoration: BoxDecoration(
           color: AppTheme.bg3, borderRadius: BorderRadius.circular(5))),
@@ -350,11 +347,11 @@ class _Bar extends StatelessWidget {
 // ── Share card ────────────────────────────────────────────────────────────────
 class _ShareCard extends StatelessWidget {
   final MatchOutcome outcome;
-  final int iq, score, streak, cpm;
+  final int power, score, streak, cpm;
   final String accPct, playerName, countryCode;
 
   const _ShareCard({
-    required this.outcome, required this.iq, required this.accPct,
+    required this.outcome, required this.power, required this.accPct,
     required this.score, required this.streak, required this.cpm,
     required this.playerName, required this.countryCode,
   });
@@ -366,7 +363,7 @@ class _ShareCard extends StatelessWidget {
     return '''🎯 Tug of War: Mathematics
 ━━━━━━━━━━━━━━━━
 $flag $playerName just $res vs CPU!
-🧠 Math IQ:  $iq  (${_iqLabel(iq)})
+🧠 Brain Power: $power (${_powerLabel(power)})
 📊 Score:    $score
 ✅ Accuracy: $accPct
 ⚡ Speed:    $cpm Q/min
@@ -443,13 +440,13 @@ Can you beat me? 👉 tugofwar.math 🎮''';
     return String.fromCharCode(b + c[0]) + String.fromCharCode(b + c[1]);
   }
 
-  String _iqLabel(int iq) {
-    if (iq >= 145) return 'Genius';
-    if (iq >= 130) return 'Gifted';
-    if (iq >= 120) return 'Superior';
-    if (iq >= 110) return 'Above Avg';
-    if (iq >= 90)  return 'Average';
-    return 'Developing';
+  String _powerLabel(int pwr) {
+    if (pwr >= 145) return 'Legendary';
+    if (pwr >= 130) return 'Epic';
+    if (pwr >= 120) return 'Super';
+    if (pwr >= 110) return 'Strong';
+    if (pwr >= 90)  return 'Solid';
+    return 'Growing';
   }
 }
 
