@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ADDED: Required for SystemNavigator.pop()
+import 'package:flutter/services.dart'; 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/app_providers.dart';
@@ -25,45 +25,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  // ── Quit Game Dialog ───────────────────────────────────────────────────────
   Future<void> _showQuitConfirmation(BuildContext context) async {
     final bool? shouldQuit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppTheme.bg2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: AppTheme.bg3),
-        ),
-        title: Text('Leaving so soon?', 
-            style: AppTheme.display(22, color: AppTheme.yellowLight), 
-            textAlign: TextAlign.center),
-        content: Text('Are you sure you want to quit the game?', 
-            style: AppTheme.body(14, color: AppTheme.textSecondary), 
-            textAlign: TextAlign.center),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: AppTheme.bg3)),
+        title: Text('Leaving so soon?', style: AppTheme.display(22, color: AppTheme.yellowLight), textAlign: TextAlign.center),
+        content: Text('Are you sure you want to quit the game?', style: AppTheme.body(14, color: AppTheme.textSecondary), textAlign: TextAlign.center),
         actionsAlignment: MainAxisAlignment.center,
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel', style: AppTheme.body(15, color: AppTheme.blueLight, weight: FontWeight.bold)),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Cancel', style: AppTheme.body(15, color: AppTheme.blueLight, weight: FontWeight.bold))),
           const SizedBox(width: 10),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.red.withOpacity(0.8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.red.withOpacity(0.8), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             onPressed: () => Navigator.of(context).pop(true),
             child: Text('Quit', style: AppTheme.body(15, color: Colors.white, weight: FontWeight.bold)),
           ),
         ],
       ),
     );
-
-    // If the user clicks "Quit", close the app
-    if (shouldQuit == true) {
-      SystemNavigator.pop();
-    }
+    if (shouldQuit == true) SystemNavigator.pop();
   }
 
   @override
@@ -71,18 +53,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final profile  = ref.watch(profileProvider);
     final progress = ref.watch(progressProvider);
 
-    final char = kCharacters.firstWhere(
-      (c) => c.id == progress.selectedCharacter,
-      orElse: () => kCharacters.first,
-    );
+    final char = kCharacters.firstWhere((c) => c.id == progress.selectedCharacter, orElse: () => kCharacters.first);
+    final accuracy = progress.totalAnswered > 0 ? '${(progress.totalCorrect / progress.totalAnswered * 100).round()}%' : '-';
 
-    final accuracy = progress.totalAnswered > 0
-        ? '${(progress.totalCorrect / progress.totalAnswered * 100).round()}%'
-        : '-';
-
-    // ADDED: PopScope intercepts the hardware back button
     return PopScope(
-      canPop: false, // Prevents default back button behavior
+      canPop: false, 
       onPopInvoked: (bool didPop) {
         if (didPop) return;
         _showQuitConfirmation(context);
@@ -104,11 +79,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                // Streak bar
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: AppTheme.yellow.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppTheme.radius),
+                    color: AppTheme.yellow.withOpacity(0.1), borderRadius: BorderRadius.circular(AppTheme.radius),
                     border: Border.all(color: AppTheme.yellow.withOpacity(0.3)),
                   ),
                   child: Row(
@@ -119,20 +94,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('DAY STREAK', style: AppTheme.body(11, color: AppTheme.textSecondary)),
-                          Text(
-                            '${progress.streakDays} day${progress.streakDays != 1 ? 's' : ''}',
-                            style: AppTheme.display(22, color: AppTheme.yellowLight),
-                          ),
+                          Text('${progress.streakDays} day${progress.streakDays != 1 ? 's' : ''}', style: AppTheme.display(22, color: AppTheme.yellowLight)),
                         ],
                       ),
                       const Spacer(),
-                      Text('Age ${profile.ageGroup == 'A' ? '5–7' : '8–11'}',
-                          style: AppTheme.body(13, color: AppTheme.textSecondary)),
+                      Text('Age ${profile.ageGroup == 'A' ? '5–7' : '8–11'}', style: AppTheme.body(13, color: AppTheme.textSecondary)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 16),
 
+                // Character display
                 AppCard(
                   child: Column(
                     children: [
@@ -145,11 +117,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                // Stats grid
                 GridView.count(
-                  crossAxisCount: 2, shrinkWrap: true,
-                  crossAxisSpacing: 12, mainAxisSpacing: 12,
-                  childAspectRatio: 1.4,
-                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2, shrinkWrap: true, crossAxisSpacing: 12, mainAxisSpacing: 12,
+                  childAspectRatio: 1.4, physics: const NeverScrollableScrollPhysics(),
                   children: [
                     StatCard(value: '${progress.totalWins}', label: 'Wins'),
                     StatCard(value: '${progress.totalGames}', label: 'Matches'),
@@ -159,15 +130,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
 
+                // ── PLAY BUTTONS ──
                 BigButton(
-                  label: '⚡ Quick Play',
-                  onTap: () => context.push('/countdown'),
-                  color: AppTheme.green,
-                  shadowColor: const Color(0xFF15803D),
+                  label: '🗺️ Adventure Mode',
+                  onTap: () => context.push('/adventure'),
+                  color: AppTheme.blue,
+                  shadowColor: const Color(0xFF1D4ED8), // Dark blue shadow
                   fontSize: 24,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
+                GhostButton(
+                  label: '⚡ Quick Play',
+                  onTap: () => context.push('/countdown'),
+                ),
+                const SizedBox(height: 20),
 
+                // Nav row
                 Row(
                   children: [
                     _NavBtn(emoji: '📊', label: 'Progress', onTap: () => context.push('/progress')),
@@ -192,7 +170,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 class _NavBtn extends StatelessWidget {
   final String emoji, label;
   final VoidCallback onTap;
-
   const _NavBtn({required this.emoji, required this.label, required this.onTap});
 
   @override
@@ -202,18 +179,8 @@ class _NavBtn extends StatelessWidget {
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: AppTheme.bg2,
-            borderRadius: BorderRadius.circular(AppTheme.radius),
-            border: Border.all(color: AppTheme.bg3),
-          ),
-          child: Column(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 26)),
-              const SizedBox(height: 4),
-              Text(label, style: AppTheme.body(12, color: AppTheme.textSecondary)),
-            ],
-          ),
+          decoration: BoxDecoration(color: AppTheme.bg2, borderRadius: BorderRadius.circular(AppTheme.radius), border: Border.all(color: AppTheme.bg3)),
+          child: Column(children: [Text(emoji, style: const TextStyle(fontSize: 26)), const SizedBox(height: 4), Text(label, style: AppTheme.body(12, color: AppTheme.textSecondary))]),
         ),
       ),
     );

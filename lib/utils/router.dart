@@ -10,10 +10,10 @@ import '../screens/progress_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/parent_settings_screen.dart';
 import '../screens/leaderboard_screen.dart';
+import '../screens/adventure_screen.dart'; // ADDED IMPORT
 import '../services/storage_service.dart';
 
 class AppRouter {
-  // ADDED: This Master Key forces the hardware back button to sync with go_router's stack
   static final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
   static final GoRouter router = GoRouter(
@@ -31,6 +31,7 @@ class AppRouter {
       GoRoute(path: '/settings',   builder: (_, __) => const SettingsScreen()),
       GoRoute(path: '/leaderboard',builder: (_, __) => const LeaderboardScreen()),
       GoRoute(path: '/parent-settings', builder: (_, __) => const ParentSettingsScreen()),
+      GoRoute(path: '/adventure',  builder: (_, __) => const AdventureScreen()), // ADDED ROUTE
     ],
   );
 }
