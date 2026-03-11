@@ -15,14 +15,36 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStateMixin {
   
+  // Premium Animations
+  late AnimationController _floatCtrl;
+  late Animation<double> _floatAnim;
+  
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulseAnim;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AudioService().setBgmState(BgmState.menu);
     });
+
+    // Character Floating Animation
+    _floatCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+    _floatAnim = Tween<double>(begin: -6.0, end: 6.0).animate(CurvedAnimation(parent: _floatCtrl, curve: Curves.easeInOut));
+
+    // Adventure Button Pulsing Animation
+    _pulseCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 1.0, end: 1.04).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _floatCtrl.dispose();
+    _pulseCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _showQuitConfirmation(BuildContext context) async {
@@ -63,7 +85,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final progress = ref.watch(progressProvider);
 
     final char = kCharacters.firstWhere((c) => c.id == progress.selectedCharacter, orElse: () => kCharacters.first);
-    final accuracy = progress.totalAnswered > 0 ? '${(progress.totalCorrect / progress.totalAnswered * 100).round()}%' : '-';
 
     return PopScope(
       canPop: false, 
@@ -72,107 +93,144 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _showQuitConfirmation(context);
       },
       child: Scaffold(
+        backgroundColor: AppTheme.bg,
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Row(
+          child: Column(
+            children: [
+              // ── TOP BAR (Clean & Minimal) ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+                child: Row(
                   children: [
-                    const Text('🪢', style: TextStyle(fontSize: 28)),
-                    const SizedBox(width: 8),
-                    Text('Tug of War', style: AppTheme.display(22, color: AppTheme.yellowLight)),
-                    const Spacer(),
-                    CoinBadge(coins: progress.coins),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.yellow.withOpacity(0.1), borderRadius: BorderRadius.circular(AppTheme.radius),
-                    border: Border.all(color: AppTheme.yellow.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text('🔥', style: TextStyle(fontSize: 28)),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // Streak Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.yellow.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.yellow.withOpacity(0.4)),
+                      ),
+                      child: Row(
                         children: [
-                          Text('DAY STREAK', style: AppTheme.body(11, color: AppTheme.textSecondary)),
-                          Text('${progress.streakDays} day${progress.streakDays != 1 ? 's' : ''}', style: AppTheme.display(22, color: AppTheme.yellowLight)),
+                          const Text('🔥', style: TextStyle(fontSize: 18)),
+                          const SizedBox(width: 6),
+                          Text('${progress.streakDays}', style: AppTheme.display(16, color: AppTheme.yellowLight)),
                         ],
                       ),
-                      const Spacer(),
-                      Text('Age ${profile.ageGroup == 'A' ? '5–7' : '8–11'}', style: AppTheme.body(13, color: AppTheme.textSecondary)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                AppCard(
-                  child: Column(
-                    children: [
-                      Text(char.emoji, style: const TextStyle(fontSize: 80)),
-                      const SizedBox(height: 8),
-                      Text(char.name, style: AppTheme.display(18, color: AppTheme.textSecondary)),
-                      Text('Your Champion', style: AppTheme.body(12, color: AppTheme.textSecondary)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                GridView.count(
-                  crossAxisCount: 2, shrinkWrap: true, crossAxisSpacing: 12, mainAxisSpacing: 12,
-                  childAspectRatio: 1.4, physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    StatCard(value: '${progress.totalWins}', label: 'Wins'),
-                    StatCard(value: '${progress.totalGames}', label: 'Matches'),
-                    StatCard(value: '${progress.bestStreak}', label: 'Best Streak'),
-                    StatCard(value: accuracy, label: 'Accuracy'),
+                    ),
+                    const Spacer(),
+                    // Coins Pill
+                    CoinBadge(coins: progress.coins),
+                    const SizedBox(width: 12),
+                    // Settings Icon
+                    GestureDetector(
+                      onTap: () => context.push('/settings'),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: AppTheme.bg2, shape: BoxShape.circle, border: Border.all(color: AppTheme.bg3)),
+                        child: const Text('⚙️', style: TextStyle(fontSize: 18)),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 20),
+              ),
 
-                // ── DAILY QUESTS BANNER ──
-                _DailyQuestBanner(onTap: () => _showDailyQuests(context)),
-                const SizedBox(height: 20),
-
-                BigButton(
-                  label: '🗺️ Adventure Mode',
-                  onTap: () => context.push('/adventure'),
-                  color: AppTheme.blue,
-                  shadowColor: const Color(0xFF1D4ED8), 
-                  fontSize: 24,
-                ),
-                const SizedBox(height: 10),
-                GhostButton(
-                  label: '⚡ Quick Play',
-                  onTap: () {
-                    ref.read(matchConfigProvider.notifier).state = {
-                      'isAdventure': false, 'level': 0, 'isBoss': false
-                    };
-                    context.push('/countdown');
-                  }
-                ),
-                const SizedBox(height: 20),
-
-                Row(
+              // ── PREMIUM HERO SECTION ──
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _NavBtn(emoji: '📊', label: 'Progress', onTap: () => context.push('/progress')),
-                    const SizedBox(width: 10),
-                    _NavBtn(emoji: '🛒', label: 'Shop', onTap: () => context.push('/shop')),
-                    const SizedBox(width: 10),
-                    _NavBtn(emoji: '🏆', label: 'Leaderboard', onTap: () => context.push('/leaderboard')),
-                    const SizedBox(width: 10),
-                    _NavBtn(emoji: '⚙️', label: 'Settings', onTap: () => context.push('/settings')),
+                    // Floating Character
+                    AnimatedBuilder(
+                      animation: _floatAnim,
+                      builder: (context, child) => Transform.translate(
+                        offset: Offset(0, _floatAnim.value),
+                        child: child,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.center,
+                        clipBehavior: Clip.none,
+                        children: [
+                          // Glowing backdrop
+                          Container(
+                            width: 140, height: 140,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [BoxShadow(color: AppTheme.blue.withOpacity(0.2), blurRadius: 40, spreadRadius: 10)],
+                            ),
+                          ),
+                          Text(char.emoji, style: const TextStyle(fontSize: 100, shadows: [Shadow(color: Colors.black45, blurRadius: 20, offset: Offset(0, 10))])),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text('Ready, ${profile.playerName}?', style: AppTheme.display(24, color: AppTheme.textPrimary)),
+                    Text(char.name, style: AppTheme.body(14, color: AppTheme.textSecondary, weight: FontWeight.w800)),
                   ],
                 ),
-                const SizedBox(height: 20),
-              ],
-            ),
+              ),
+
+              // ── DAILY QUEST NOTIFICATION ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _DailyQuestBanner(onTap: () => _showDailyQuests(context)),
+              ),
+              const SizedBox(height: 20),
+
+              // ── MAIN PLAY BUTTONS ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    AnimatedBuilder(
+                      animation: _pulseAnim,
+                      builder: (context, child) => Transform.scale(
+                        scale: _pulseAnim.value,
+                        child: child,
+                      ),
+                      child: BigButton(
+                        label: '🗺️ ADVENTURE',
+                        onTap: () => context.push('/adventure'),
+                        color: AppTheme.blue,
+                        shadowColor: const Color(0xFF1D4ED8), 
+                        fontSize: 26,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GhostButton(
+                      label: '⚡ Quick Play',
+                      onTap: () {
+                        ref.read(matchConfigProvider.notifier).state = {
+                          'isAdventure': false, 'level': 0, 'isBoss': false
+                        };
+                        context.push('/countdown');
+                      }
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // ── SLEEK BOTTOM NAVIGATION DOCK ──
+              Container(
+                margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.bg2,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppTheme.bg3),
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _DockIcon(emoji: '🛒', label: 'Shop', onTap: () => context.push('/shop')),
+                    _DockIcon(emoji: '📊', label: 'Stats', onTap: () => context.push('/progress')),
+                    _DockIcon(emoji: '🏆', label: 'Ranks', onTap: () => context.push('/leaderboard')),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -221,6 +279,29 @@ class _DailyQuestBanner extends ConsumerWidget {
               Text('View All →', style: AppTheme.body(12, color: AppTheme.blueLight, weight: FontWeight.w800)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Dock Icon ────────────────────────────────────────────────────────────────
+class _DockIcon extends StatelessWidget {
+  final String emoji, label;
+  final VoidCallback onTap;
+  const _DockIcon({required this.emoji, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 26)),
+          const SizedBox(height: 4),
+          Text(label, style: AppTheme.body(10, color: AppTheme.textSecondary, weight: FontWeight.w800)),
+        ],
       ),
     );
   }
@@ -318,26 +399,6 @@ class _DailyQuestsModal extends ConsumerWidget {
           }).toList(),
           const SizedBox(height: 20),
         ],
-      ),
-    );
-  }
-}
-
-class _NavBtn extends StatelessWidget {
-  final String emoji, label;
-  final VoidCallback onTap;
-  const _NavBtn({required this.emoji, required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(color: AppTheme.bg2, borderRadius: BorderRadius.circular(AppTheme.radius), border: Border.all(color: AppTheme.bg3)),
-          child: Column(children: [Text(emoji, style: const TextStyle(fontSize: 26)), const SizedBox(height: 4), Text(label, style: AppTheme.body(12, color: AppTheme.textSecondary))]),
-        ),
       ),
     );
   }
