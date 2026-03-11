@@ -229,6 +229,10 @@ class Progress {
   int divisionCorrect;
   int totalResponseTimeMs;
   int totalQuestionsAnswered;
+  
+  // NEW FIELDS FOR DAILY QUESTS
+  List<DailyQuest> dailyQuests;
+  DateTime? lastQuestDate;
 
   Progress({
     this.coins = 0,
@@ -248,6 +252,8 @@ class Progress {
     this.divisionCorrect = 0,
     this.totalResponseTimeMs = 0,
     this.totalQuestionsAnswered = 0,
+    this.dailyQuests = const [],
+    this.lastQuestDate,
   });
 }
 
@@ -297,7 +303,7 @@ class LeaderboardEntry {
   String countryCode;
   int score;
   double accuracy;
-  int brainPower; // CHANGED: Replaced IQ with Brain Power
+  int brainPower;
   DateTime date;
 
   LeaderboardEntry({
@@ -308,4 +314,41 @@ class LeaderboardEntry {
     required this.brainPower,
     required this.date,
   });
+}
+
+// ── NEW DATA MODEL: DAILY QUESTS ───────────────────────────────
+class DailyQuest {
+  final String id;
+  final String title;
+  final int target;
+  int current;
+  final int reward;
+  bool isClaimed;
+
+  DailyQuest({
+    required this.id,
+    required this.title,
+    required this.target,
+    this.current = 0,
+    required this.reward,
+    this.isClaimed = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'target': target,
+    'current': current,
+    'reward': reward,
+    'isClaimed': isClaimed,
+  };
+
+  factory DailyQuest.fromJson(Map<String, dynamic> json) => DailyQuest(
+    id: json['id'],
+    title: json['title'],
+    target: json['target'],
+    current: json['current'] ?? 0,
+    reward: json['reward'],
+    isClaimed: json['isClaimed'] ?? false,
+  );
 }

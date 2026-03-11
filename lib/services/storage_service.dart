@@ -42,6 +42,13 @@ class StorageService {
     if (raw == null) return Progress();
     try {
       final j = jsonDecode(raw);
+      
+      // Parse Daily Quests with backwards compatibility
+      List<DailyQuest> quests = [];
+      if (j['dailyQuests'] != null) {
+        quests = (j['dailyQuests'] as List).map((q) => DailyQuest.fromJson(q)).toList();
+      }
+
       return Progress(
         coins: j['coins'] ?? 0,
         unlockedItems: List<String>.from(j['unlockedItems'] ?? ['hero', 'classic']),
@@ -58,6 +65,8 @@ class StorageService {
         divisionCorrect: j['divisionCorrect'] ?? 0,
         totalResponseTimeMs: j['totalResponseTimeMs'] ?? 0,
         totalQuestionsAnswered: j['totalQuestionsAnswered'] ?? 0,
+        dailyQuests: quests,
+        lastQuestDate: j['lastQuestDate'] != null ? DateTime.tryParse(j['lastQuestDate']) : null,
       );
     } catch (_) { return Progress(); }
   }
@@ -74,6 +83,8 @@ class StorageService {
         'divisionCorrect': p.divisionCorrect,
         'totalResponseTimeMs': p.totalResponseTimeMs,
         'totalQuestionsAnswered': p.totalQuestionsAnswered,
+        'dailyQuests': p.dailyQuests.map((q) => q.toJson()).toList(),
+        'lastQuestDate': p.lastQuestDate?.toIso8601String(),
       }));
 
   // ── Settings ────────────────────────────────────────────
@@ -110,7 +121,6 @@ class StorageService {
         countryCode: j['countryCode'] ?? 'US',
         score: j['score'] ?? 0,
         accuracy: (j['accuracy'] ?? 0.0).toDouble(),
-        // BACKWARD COMPATIBILITY: Checks for new 'brainPower' key, falls back to old 'iqScore'
         brainPower: j['brainPower'] ?? j['iqScore'] ?? 100, 
         date: DateTime.tryParse(j['date'] ?? '') ?? DateTime.now(),
       )).toList();
@@ -133,7 +143,6 @@ class StorageService {
   }
 
   static List<LeaderboardEntry> _defaultLeaderboard() {
-    // Realistic seed data from various countries using new Brain Power logic
     final now = DateTime.now();
     return [
       LeaderboardEntry(playerName: 'MathWiz', countryCode: 'US', score: 18, accuracy: 0.94, brainPower: 142, date: now.subtract(const Duration(days: 1))),
