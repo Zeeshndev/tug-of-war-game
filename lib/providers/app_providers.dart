@@ -52,7 +52,26 @@ final profileProvider = StateNotifierProvider<ProfileNotifier, Profile>(
 
 // ── Progress ─────────────────────────────────────────────────────────────────
 class ProgressNotifier extends StateNotifier<Progress> {
-  ProgressNotifier() : super(StorageService.getProgress());
+  ProgressNotifier() : super(StorageService.getProgress()) {
+    _initializeQuests();
+  }
+
+  void _initializeQuests() {
+    final now = DateTime.now();
+    final last = state.lastQuestDate;
+    
+    // If it's a new day, generate fresh quests!
+    if (last == null || last.year != now.year || last.month != now.month || last.day != now.day) {
+      final p = _clone();
+      p.dailyQuests = [
+        DailyQuest(id: 'play_3', title: 'Play 3 Matches', target: 3, reward: 15),
+        DailyQuest(id: 'win_2', title: 'Win 2 Matches', target: 2, reward: 20),
+        DailyQuest(id: 'streak_5', title: 'Get a Streak of 5', target: 5, reward: 25),
+      ];
+      p.lastQuestDate = now;
+      _save(p);
+    }
+  }
 
   Progress _clone() => Progress(
     coins: state.coins, unlockedItems: List.from(state.unlockedItems),
@@ -66,10 +85,26 @@ class ProgressNotifier extends StateNotifier<Progress> {
     divisionCorrect: state.divisionCorrect,
     totalResponseTimeMs: state.totalResponseTimeMs,
     totalQuestionsAnswered: state.totalQuestionsAnswered,
+    dailyQuests: List.from(state.dailyQuests),
+    lastQuestDate: state.lastQuestDate,
   );
 
   Future<void> _save(Progress p) async {
     await StorageService.saveProgress(p); state = p;
+  }
+
+  Future<void> claimQuest(String questId) async {
+    final p = _clone();
+    final qIndex = p.dailyQuests.indexWhere((q) => q.id == questId);
+    if (qIndex != -1) {
+      final q = p.dailyQuests[qIndex];
+      if (q.current >= q.target && !q.isClaimed) {
+        q.isClaimed = true;
+        p.coins += q.reward;
+        await _save(p);
+        AudioService().playCorrect(); // Satisfying coin sound
+      }
+    }
   }
 
   Future<void> recordMatchResult({
@@ -97,6 +132,14 @@ class ProgressNotifier extends StateNotifier<Progress> {
     p.divisionCorrect       += skillCorrect[MathSkill.division] ?? 0;
     p.totalResponseTimeMs   += totalResponseMs;
     p.totalQuestionsAnswered += responsesCount;
+    
+    // UPDATE DAILY QUEST PROGRESS BEHIND THE SCENES
+    for (var q in p.dailyQuests) {
+      if (q.id == 'play_3') q.current = min(q.target, q.current + 1);
+      if (q.id == 'win_2' && won) q.current = min(q.target, q.current + 1);
+      if (q.id == 'streak_5') q.current = min(q.target, max(q.current, sessionBestStreak));
+    }
+
     await _save(p);
   }
 
@@ -205,7 +248,6 @@ class GameNotifier extends StateNotifier<GameSession> {
   void _evaluateMusic() {
     if (!state.active || state.paused) return;
     
-    // Boss music overrides dynamic pulling music
     final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
     if (isBoss) {
       AudioService().setBgmState(BgmState.boss);
@@ -238,7 +280,6 @@ class GameNotifier extends StateNotifier<GameSession> {
     _startQuestionTimer();
     _scheduleAI();
     
-    // TRIGGER EPIC BOSS MUSIC IF APPLICABLE
     final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
     AudioService().setBgmState(isBoss ? BgmState.boss : BgmState.normal);
   }
@@ -341,7 +382,6 @@ class GameNotifier extends StateNotifier<GameSession> {
     final streak = state.sessionStreak + 1;
     final best   = max(streak, state.sessionBestStreak);
     
-    // COMBO MULTIPLIER LOGIC
     final pull = 1.5 + (streak >= 10 ? 1.5 : (streak >= 5 ? 1.0 : (streak >= 3 ? 0.5 : 0.0)));
     final rope = max(-10.0, state.ropePosition - pull);
     
@@ -391,12 +431,11 @@ class GameNotifier extends StateNotifier<GameSession> {
     int maxMs = _age == 'A' ? 5000 : 3500;
     double acc = _age == 'A' ? 0.70 : 0.80;
 
-    // THE BOSS IS FASTER AND SMARTER
     final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
     if (isBoss) {
-      minMs = (minMs * 0.6).round(); // 40% Faster reaction
+      minMs = (minMs * 0.6).round();
       maxMs = (maxMs * 0.6).round();
-      acc = min(0.95, acc + 0.15);   // 15% More accurate
+      acc = min(0.95, acc + 0.15);  
     }
 
     _aiTimer = Timer(
@@ -469,7 +508,6 @@ class GameNotifier extends StateNotifier<GameSession> {
           : MatchOutcome.draw;
     }
 
-    // MASSIVE COIN PAYOUT FOR BEATING BOSSES
     final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
     final bonus = out == MatchOutcome.win ? (isBoss ? 50 : 15) : out == MatchOutcome.draw ? 5 : 0;
     
