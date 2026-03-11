@@ -268,8 +268,17 @@ class GameNotifier extends StateNotifier<GameSession> {
     _skillCorrect.clear();
     _sessionResponseMs = 0;
     _sessionResponseCount = 0;
-    final pQ = QuestionEngine.generate(_age, mode: _mode);
-    final aQ = QuestionEngine.generate(_age, mode: _mode);
+    
+    // READ ADVENTURE LEVEL DYNAMICALLY
+    final config = _ref.read(matchConfigProvider);
+    final isAdventure = config['isAdventure'] == true;
+    final level = isAdventure ? config['level'] as int : 0;
+    final isBoss = config['isBoss'] == true;
+
+    // PASS LEVEL TO ENGINE FOR DIFFICULTY SCALING
+    final pQ = QuestionEngine.generate(_age, mode: _mode, adventureLevel: level);
+    final aQ = QuestionEngine.generate(_age, mode: _mode, adventureLevel: level);
+    
     state = GameSession(
       timeLeft: _dur, questionTimeLeft: 7, active: true,
       playerQuestion: pQ, aiQuestion: aQ,
@@ -280,7 +289,6 @@ class GameNotifier extends StateNotifier<GameSession> {
     _startQuestionTimer();
     _scheduleAI();
     
-    final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
     AudioService().setBgmState(isBoss ? BgmState.boss : BgmState.normal);
   }
 
@@ -495,7 +503,7 @@ class GameNotifier extends StateNotifier<GameSession> {
     state = state.copyWith(active: false);
   }
 
-  void _endMatch(_R reason) {
+ void _endMatch(_R reason) {
     if (!state.active) return;
     _matchTimer?.cancel(); _questionTimer?.cancel(); _aiTimer?.cancel();
 
@@ -511,13 +519,9 @@ class GameNotifier extends StateNotifier<GameSession> {
     final isBoss = _ref.read(matchConfigProvider)['isBoss'] == true;
     final bonus = out == MatchOutcome.win ? (isBoss ? 50 : 15) : out == MatchOutcome.draw ? 5 : 0;
     
-    if (out == MatchOutcome.win) {
-      AudioService().playWin();
-    } else if (out == MatchOutcome.lose) {
-      AudioService().playLose();
-    } else {
-      AudioService().stopBgm();
-    }
+    if (out == MatchOutcome.win) AudioService().playWin();
+    else if (out == MatchOutcome.lose) AudioService().playLose();
+    else AudioService().stopBgm();
 
     final coins = state.coinsEarned + bonus;
     
@@ -538,11 +542,13 @@ class GameNotifier extends StateNotifier<GameSession> {
       responsesCount: _sessionResponseCount,
     );
 
+    // DE-DUPLICATION: Tag this entry as the CURRENT USER so bots don't override it
     _ref.read(leaderboardProvider.notifier).addEntry(LeaderboardEntry(
       playerName: profile.playerName, countryCode: profile.countryCode,
       score: state.playerScore,
       accuracy: state.sessionAnswered == 0 ? 0 : state.sessionCorrect / state.sessionAnswered,
       brainPower: power, date: DateTime.now(),
+      isCurrentUser: true, // PERFECTLY SOLVES THE DUPLICATE ISSUE
     ));
   }
 

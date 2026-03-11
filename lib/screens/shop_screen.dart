@@ -20,7 +20,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
   late TabController _tabCtrl;
   late ConfettiController _confetti;
   
-  // Mystery Box Animation
   late AnimationController _chestShakeCtrl;
   late Animation<double> _chestShakeAnim;
   bool _isOpeningChest = false;
@@ -56,7 +55,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
     super.dispose(); 
   }
 
-  // ── Gacha Mechanic Logic ──────────────────────────────────────────
   Future<void> _openMysteryBox() async {
     if (_isOpeningChest) return;
     final progress = ref.read(progressProvider);
@@ -66,7 +64,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
       return;
     }
 
-    // Find all locked items across BOTH categories
     final lockedChars = kCharacters.where((c) => !progress.unlockedItems.contains(c.id)).toList();
     final lockedRopes = kRopes.where((r) => !progress.unlockedItems.contains(r.id)).toList();
     final allLocked = [...lockedChars, ...lockedRopes];
@@ -77,22 +74,17 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
     }
 
     setState(() => _isOpeningChest = true);
-    
-    // Play the shaking animation twice for suspense
     await _chestShakeCtrl.forward(from: 0);
     await _chestShakeCtrl.forward(from: 0);
 
-    // Pick a random prize
     final random = Random();
     final prize = allLocked[random.nextInt(allLocked.length)];
 
-    // We clone the item with a price of 100 so the provider deducts the correct amount for the box
     final proxyItem = ShopItem(
       id: prize.id, name: prize.name, emoji: prize.emoji, 
       price: 100, category: prize.category, description: prize.description
     );
 
-    // Purchase it behind the scenes
     await ref.read(progressProvider.notifier).purchaseItem(proxyItem);
 
     setState(() => _isOpeningChest = false);
@@ -126,7 +118,9 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
                   children: [
                     Text('MYSTERY PRIZE!', style: AppTheme.body(14, color: AppTheme.yellowLight, weight: FontWeight.w900)),
                     const SizedBox(height: 16),
-                    Text(prize.emoji, style: const TextStyle(fontSize: 80)),
+                    SizedBox(height: 100, width: 100, child: prize.category == ShopCategory.character 
+                      ? FullCharacterPreview(charId: prize.id, emoji: prize.emoji) 
+                      : FullRopePreview(ropeId: prize.id)),
                     const SizedBox(height: 12),
                     Text('You unlocked', style: AppTheme.body(12, color: AppTheme.textSecondary)),
                     Text(prize.name, style: AppTheme.display(28, color: AppTheme.textPrimary)),
@@ -162,7 +156,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
           SafeArea(
             child: Column(
               children: [
-                // ── Header ────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                   child: Row(children: [
@@ -184,7 +177,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
                 ),
                 const SizedBox(height: 14),
 
-                // ── Mystery Box Banner ────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: GestureDetector(
@@ -236,7 +228,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
                 ),
                 const SizedBox(height: 16),
 
-                // ── Tabs ──────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Container(
@@ -267,29 +258,12 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
                 ),
                 const SizedBox(height: 4),
 
-                // ── Stats bar ─────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  child: Row(children: [
-                    Text('${items.where((i) => progress.unlockedItems.contains(i.id)).length}/${items.length} unlocked',
-                      style: AppTheme.body(12, color: AppTheme.textSecondary)),
-                    const Spacer(),
-                    if (_tab == ShopCategory.character)
-                      Text('Equipped: ${_getEquippedName(progress.selectedCharacter, kCharacters)}',
-                        style: AppTheme.body(12, color: AppTheme.greenLight))
-                    else
-                      Text('Equipped: ${_getEquippedName(progress.selectedRope, kRopes)}',
-                        style: AppTheme.body(12, color: AppTheme.greenLight)),
-                  ]),
-                ),
-
-                // ── Grid ─────────────────────────────────
                 Expanded(
                   child: GridView.count(
-                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 20),
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
                     crossAxisCount: 2,
                     crossAxisSpacing: 12, mainAxisSpacing: 12,
-                    childAspectRatio: 0.82,
+                    childAspectRatio: 0.72,
                     children: items.map((item) {
                       final owned = progress.unlockedItems.contains(item.id);
                       final selected = _tab == ShopCategory.character
@@ -307,7 +281,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
             ),
           ),
           
-          // Confetti overlay
           Align(
             alignment: Alignment.center,
             child: ConfettiWidget(
@@ -321,10 +294,6 @@ class _ShopScreenState extends ConsumerState<ShopScreen>
         ],
       ),
     );
-  }
-
-  String _getEquippedName(String id, List<ShopItem> items) {
-    return items.firstWhere((i) => i.id == id, orElse: () => items.first).name;
   }
 
   void _handleTap(ShopItem item, bool owned) async {
@@ -379,84 +348,212 @@ class _ShopCard extends StatelessWidget {
           color: bgColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: borderColor, width: selected ? 2.5 : 1.5),
-          boxShadow: selected ? [BoxShadow(
-            color: AppTheme.yellow.withOpacity(0.2), blurRadius: 12, spreadRadius: 1)] : null,
+          boxShadow: selected ? [BoxShadow(color: AppTheme.yellow.withOpacity(0.2), blurRadius: 12, spreadRadius: 1)] : null,
         ),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          // Selected badge
+          
           if (selected)
             Container(
-              margin: const EdgeInsets.only(bottom: 4),
+              margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.yellow, borderRadius: BorderRadius.circular(50)),
-              child: Text('✓ EQUIPPED', style: AppTheme.body(9,
-                  color: Colors.black, weight: FontWeight.w900)),
+              decoration: BoxDecoration(color: AppTheme.yellow, borderRadius: BorderRadius.circular(50)),
+              child: Text('✓ EQUIPPED', style: AppTheme.body(9, color: Colors.black, weight: FontWeight.w900)),
             )
-          else const SizedBox(height: 2),
+          else const SizedBox(height: 6),
 
-          // Emoji with lock overlay for unaffordable
-          Stack(alignment: Alignment.center, children: [
-            Text(item.emoji, style: TextStyle(
-              fontSize: 52,
-              color: (!owned && !canAfford) ? null : null,
-            )),
-            if (!owned && !canAfford)
-              Positioned(bottom: 0, right: 0, child: Container(
-                width: 22, height: 22,
+          // ── PREMIUM 3D PREVIEW INJECTION ──
+          Stack(
+            alignment: Alignment.center, 
+            children: [
+              Container(
+                width: 80, height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.black87, shape: BoxShape.circle,
-                  border: Border.all(color: AppTheme.bg3)),
-                child: const Center(child: Text('🔒', style: TextStyle(fontSize: 12))),
-              )),
-          ]),
-          const SizedBox(height: 6),
+                  shape: BoxShape.circle,
+                  color: AppTheme.bg.withOpacity(0.5),
+                ),
+              ),
+              if (item.category == ShopCategory.character)
+                SizedBox(height: 70, width: 70, child: FullCharacterPreview(charId: item.id, emoji: item.emoji))
+              else
+                SizedBox(height: 60, width: 60, child: FullRopePreview(ropeId: item.id)),
 
-          // Name
-          Text(item.name, style: AppTheme.body(14, weight: FontWeight.w800),
-              textAlign: TextAlign.center),
+              if (!owned && !canAfford)
+                Positioned(bottom: 0, right: 0, child: Container(
+                  width: 26, height: 26,
+                  decoration: BoxDecoration(color: Colors.black87, shape: BoxShape.circle, border: Border.all(color: AppTheme.bg3)),
+                  child: const Center(child: Text('🔒', style: TextStyle(fontSize: 14))),
+                )),
+            ]
+          ),
+          const SizedBox(height: 12),
 
-          // Description
+          Text(item.name, style: AppTheme.body(14, weight: FontWeight.w800), textAlign: TextAlign.center),
+          
           if (item.description != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Text(item.description!, style: AppTheme.body(10,
-                  color: AppTheme.textSecondary), textAlign: TextAlign.center, maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
+              child: Text(item.description!, style: AppTheme.body(10, color: AppTheme.textSecondary), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
 
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
 
-          // Price / status button
           if (owned && !selected)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.green.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(50),
-                border: Border.all(color: AppTheme.green.withOpacity(0.4)),
-              ),
+              decoration: BoxDecoration(color: AppTheme.green.withOpacity(0.15), borderRadius: BorderRadius.circular(50), border: Border.all(color: AppTheme.green.withOpacity(0.4))),
               child: Text('Tap to Equip', style: AppTheme.body(11, color: AppTheme.greenLight)),
             )
           else if (!owned)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
               decoration: BoxDecoration(
-                color: canAfford
-                    ? AppTheme.yellow.withOpacity(0.12)
-                    : AppTheme.bg3.withOpacity(0.5),
+                color: canAfford ? AppTheme.yellow.withOpacity(0.12) : AppTheme.bg3.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(50),
                 border: Border.all(color: canAfford ? AppTheme.yellow : AppTheme.bg3),
               ),
               child: Text(
                 item.price == 0 ? '✓ FREE' : '🪙 ${item.price}',
-                style: AppTheme.body(12,
-                  color: item.price == 0 ? AppTheme.greenLight
-                    : canAfford ? AppTheme.yellowLight : AppTheme.textSecondary,
-                  weight: FontWeight.w800),
+                style: AppTheme.body(12, color: item.price == 0 ? AppTheme.greenLight : canAfford ? AppTheme.yellowLight : AppTheme.textSecondary, weight: FontWeight.w800),
               ),
             ),
         ]),
+      ),
+    );
+  }
+}
+
+// ── FULL HEAD-TO-TOE CHARACTER PREVIEWER ──
+class FullCharacterPreview extends StatelessWidget {
+  final String charId;
+  final String emoji;
+  const FullCharacterPreview({super.key, required this.charId, required this.emoji});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _MiniCharacterPainter(charId: charId, emoji: emoji),
+    );
+  }
+}
+
+class _MiniCharacterPainter extends CustomPainter {
+  final String charId;
+  final String emoji;
+  const _MiniCharacterPainter({required this.charId, required this.emoji});
+
+  Color _getShirtColor() {
+    switch (charId) {
+      case 'ninja': return const Color(0xFF222222);
+      case 'wizard': return const Color(0xFF8B5CF6);
+      case 'robot': return const Color(0xFF9CA3AF);
+      case 'alien': return const Color(0xFF10B981);
+      case 'astronaut': return const Color(0xFFF3F4F6);
+      case 'vampire': return const Color(0xFF991B1B);
+      case 'dragon': return const Color(0xFF065F46);
+      case 'knight': return const Color(0xFF6B7280);
+      case 'pirate': return const Color(0xFF581C87);
+      case 'clown': return const Color(0xFFDB2777);
+      case 'dino': return const Color(0xFF65A30D);
+      default: return const Color(0xFF3A88C8); 
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size sz) {
+    final cx = sz.width / 2;
+    final cy = sz.height / 2;
+    final h = sz.height * 1.5; 
+    
+    final headR = h * 0.080;
+    final torsoH= h * 0.220;
+    final torsoW= h * 0.180;
+    final legLen= h * 0.205;
+    final legW  = h * 0.044;
+    final armW  = h * 0.033;
+    final shoeW = h * 0.065;
+    final shoeH = h * 0.034;
+
+    final shirtColor = _getShirtColor();
+    final pantsColor = const Color(0xFF181830);
+    final skinColor = const Color(0xFFF5C898);
+
+    // Legs
+    final lp = Paint()..color = pantsColor..strokeWidth = legW..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx - 5, cy + torsoH/2), Offset(cx - 10, cy + torsoH/2 + legLen), lp);
+    canvas.drawLine(Offset(cx + 5, cy + torsoH/2), Offset(cx + 10, cy + torsoH/2 + legLen), lp);
+
+    // Shoes
+    final sp = Paint()..color = const Color(0xFF1144AA);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(cx - 15, cy + torsoH/2 + legLen, shoeW, shoeH), const Radius.circular(5)), sp);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(cx + 5, cy + torsoH/2 + legLen, shoeW, shoeH), const Radius.circular(5)), sp);
+
+    // Torso
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(cx, cy), width: torsoW, height: torsoH), Radius.circular(torsoW * 0.18)),
+      Paint()..color = shirtColor,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromCenter(center: Offset(cx, cy + torsoH/2 - 2), width: torsoW * 0.78, height: h * 0.015), const Radius.circular(2)),
+      Paint()..color = const Color(0xFF5A2800),
+    );
+
+    // Arms
+    final ap = Paint()..color = shirtColor..strokeWidth = armW * 1.6..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx - torsoW/2, cy - torsoH/4), Offset(cx - torsoW, cy + 10), ap);
+    canvas.drawLine(Offset(cx + torsoW/2, cy - torsoH/4), Offset(cx + torsoW, cy + 10), ap);
+    
+    canvas.drawCircle(Offset(cx - torsoW, cy + 10), armW * 1.4, Paint()..color = skinColor);
+    canvas.drawCircle(Offset(cx + torsoW, cy + 10), armW * 1.4, Paint()..color = skinColor);
+
+    // Neck
+    canvas.drawLine(Offset(cx, cy - torsoH/2), Offset(cx, cy - torsoH/2 - headR), Paint()..color = skinColor..strokeWidth = headR * 0.65..strokeCap = StrokeCap.round);
+
+    // Head (Emoji)
+    final tp = TextPainter(
+      text: TextSpan(text: emoji, style: TextStyle(fontSize: headR * 3.5, shadows: const [Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 2))])),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(cx - tp.width / 2, cy - torsoH/2 - headR - tp.height / 2));
+  }
+  @override bool shouldRepaint(_MiniCharacterPainter old) => old.charId != charId;
+}
+
+// ── FULL PREMIUM ROPE PREVIEWER ──
+class FullRopePreview extends StatelessWidget {
+  final String ropeId;
+  const FullRopePreview({super.key, required this.ropeId});
+
+  List<Color> _getRopeColors() {
+    switch (ropeId) {
+      case 'fire':     return [Colors.red.shade900, Colors.orange, Colors.yellow, Colors.orange];
+      case 'ice':      return [Colors.blue.shade800, Colors.cyanAccent, Colors.white, Colors.cyanAccent];
+      case 'gold':     return [Colors.amber.shade800, Colors.yellowAccent, Colors.white, Colors.amber];
+      case 'rainbow':  return [Colors.red, Colors.yellow, Colors.green, Colors.blue, Colors.purple];
+      case 'electric': return [Colors.indigo, Colors.lightBlueAccent, Colors.white, Colors.indigo];
+      case 'lava':     return [Colors.black87, Colors.red.shade600, Colors.orange, Colors.black87];
+      case 'neon':     return [Colors.green.shade900, Colors.greenAccent, Colors.white, Colors.greenAccent];
+      case 'cosmic':   return [Colors.deepPurple.shade900, Colors.purpleAccent, Colors.pinkAccent];
+      case 'dragon':   return [Colors.green.shade900, Colors.lightGreenAccent, Colors.green.shade800];
+      case 'classic': 
+      default:         return [const Color(0xFF4A2F1D), const Color(0xFF8B5A2B), const Color(0xFF4A2F1D)];
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _getRopeColors();
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [BoxShadow(color: colors.first.withOpacity(0.8), blurRadius: 15, spreadRadius: 2)],
+      ),
+      child: Center(
+        child: Container(
+          width: 30, height: 30,
+          decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.black45, width: 2)),
+        )
       ),
     );
   }

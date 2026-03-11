@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:math';
 import '../models/game_models.dart';
 
 class StorageService {
@@ -18,13 +19,9 @@ class StorageService {
     try {
       final j = jsonDecode(raw);
       return Profile(
-        ageGroup: j['ageGroup'] ?? 'A',
-        soundOn: j['soundOn'] ?? true,
-        vibrationOn: j['vibrationOn'] ?? true,
-        language: j['language'] ?? 'en',
-        onboardingComplete: j['onboardingComplete'] ?? false,
-        playerName: j['playerName'] ?? 'Player',
-        countryCode: j['countryCode'] ?? 'US',
+        ageGroup: j['ageGroup'] ?? 'A', soundOn: j['soundOn'] ?? true, vibrationOn: j['vibrationOn'] ?? true,
+        language: j['language'] ?? 'en', onboardingComplete: j['onboardingComplete'] ?? false,
+        playerName: j['playerName'] ?? 'Player', countryCode: j['countryCode'] ?? 'US',
       );
     } catch (_) { return Profile(); }
   }
@@ -42,31 +39,20 @@ class StorageService {
     if (raw == null) return Progress();
     try {
       final j = jsonDecode(raw);
-      
-      // Parse Daily Quests with backwards compatibility
       List<DailyQuest> quests = [];
       if (j['dailyQuests'] != null) {
         quests = (j['dailyQuests'] as List).map((q) => DailyQuest.fromJson(q)).toList();
       }
-
       return Progress(
-        coins: j['coins'] ?? 0,
-        unlockedItems: List<String>.from(j['unlockedItems'] ?? ['hero', 'classic']),
-        selectedCharacter: j['selectedCharacter'] ?? 'hero',
-        selectedRope: j['selectedRope'] ?? 'classic',
-        streakDays: j['streakDays'] ?? 0,
-        lastPlayedDate: j['lastPlayedDate'] != null ? DateTime.tryParse(j['lastPlayedDate']) : null,
+        coins: j['coins'] ?? 0, unlockedItems: List<String>.from(j['unlockedItems'] ?? ['hero', 'classic']),
+        selectedCharacter: j['selectedCharacter'] ?? 'hero', selectedRope: j['selectedRope'] ?? 'classic',
+        streakDays: j['streakDays'] ?? 0, lastPlayedDate: j['lastPlayedDate'] != null ? DateTime.tryParse(j['lastPlayedDate']) : null,
         totalWins: j['totalWins'] ?? 0, totalGames: j['totalGames'] ?? 0,
-        totalCorrect: j['totalCorrect'] ?? 0, totalAnswered: j['totalAnswered'] ?? 0,
-        bestStreak: j['bestStreak'] ?? 0,
-        additionCorrect: j['additionCorrect'] ?? 0,
-        subtractionCorrect: j['subtractionCorrect'] ?? 0,
-        multiplicationCorrect: j['multiplicationCorrect'] ?? 0,
-        divisionCorrect: j['divisionCorrect'] ?? 0,
-        totalResponseTimeMs: j['totalResponseTimeMs'] ?? 0,
-        totalQuestionsAnswered: j['totalQuestionsAnswered'] ?? 0,
-        dailyQuests: quests,
-        lastQuestDate: j['lastQuestDate'] != null ? DateTime.tryParse(j['lastQuestDate']) : null,
+        totalCorrect: j['totalCorrect'] ?? 0, totalAnswered: j['totalAnswered'] ?? 0, bestStreak: j['bestStreak'] ?? 0,
+        additionCorrect: j['additionCorrect'] ?? 0, subtractionCorrect: j['subtractionCorrect'] ?? 0,
+        multiplicationCorrect: j['multiplicationCorrect'] ?? 0, divisionCorrect: j['divisionCorrect'] ?? 0,
+        totalResponseTimeMs: j['totalResponseTimeMs'] ?? 0, totalQuestionsAnswered: j['totalQuestionsAnswered'] ?? 0,
+        dailyQuests: quests, lastQuestDate: j['lastQuestDate'] != null ? DateTime.tryParse(j['lastQuestDate']) : null,
       );
     } catch (_) { return Progress(); }
   }
@@ -76,15 +62,11 @@ class StorageService {
         'coins': p.coins, 'unlockedItems': p.unlockedItems,
         'selectedCharacter': p.selectedCharacter, 'selectedRope': p.selectedRope,
         'streakDays': p.streakDays, 'lastPlayedDate': p.lastPlayedDate?.toIso8601String(),
-        'totalWins': p.totalWins, 'totalGames': p.totalGames,
-        'totalCorrect': p.totalCorrect, 'totalAnswered': p.totalAnswered,
-        'bestStreak': p.bestStreak, 'additionCorrect': p.additionCorrect,
-        'subtractionCorrect': p.subtractionCorrect, 'multiplicationCorrect': p.multiplicationCorrect,
-        'divisionCorrect': p.divisionCorrect,
-        'totalResponseTimeMs': p.totalResponseTimeMs,
-        'totalQuestionsAnswered': p.totalQuestionsAnswered,
-        'dailyQuests': p.dailyQuests.map((q) => q.toJson()).toList(),
-        'lastQuestDate': p.lastQuestDate?.toIso8601String(),
+        'totalWins': p.totalWins, 'totalGames': p.totalGames, 'totalCorrect': p.totalCorrect, 'totalAnswered': p.totalAnswered,
+        'bestStreak': p.bestStreak, 'additionCorrect': p.additionCorrect, 'subtractionCorrect': p.subtractionCorrect,
+        'multiplicationCorrect': p.multiplicationCorrect, 'divisionCorrect': p.divisionCorrect,
+        'totalResponseTimeMs': p.totalResponseTimeMs, 'totalQuestionsAnswered': p.totalQuestionsAnswered,
+        'dailyQuests': p.dailyQuests.map((q) => q.toJson()).toList(), 'lastQuestDate': p.lastQuestDate?.toIso8601String(),
       }));
 
   // ── Settings ────────────────────────────────────────────
@@ -94,11 +76,8 @@ class StorageService {
     try {
       final j = jsonDecode(raw);
       return AppSettings(
-        difficultyLock: j['difficultyLock'] ?? false,
-        adsEnabled: j['adsEnabled'] ?? true,
-        sessionTimeLimit: j['sessionTimeLimit'] ?? 0,
-        matchDuration: j['matchDuration'] ?? 90,
-        gameMode: j['gameMode'] ?? 'mixed',
+        difficultyLock: j['difficultyLock'] ?? false, adsEnabled: j['adsEnabled'] ?? true,
+        sessionTimeLimit: j['sessionTimeLimit'] ?? 0, matchDuration: j['matchDuration'] ?? 90, gameMode: j['gameMode'] ?? 'mixed',
       );
     } catch (_) { return AppSettings(); }
   }
@@ -106,56 +85,111 @@ class StorageService {
   static Future<void> saveSettings(AppSettings s) async =>
       _p.setString('settings', jsonEncode({
         'difficultyLock': s.difficultyLock, 'adsEnabled': s.adsEnabled,
-        'sessionTimeLimit': s.sessionTimeLimit, 'matchDuration': s.matchDuration,
-        'gameMode': s.gameMode,
+        'sessionTimeLimit': s.sessionTimeLimit, 'matchDuration': s.matchDuration, 'gameMode': s.gameMode,
       }));
 
-  // ── Leaderboard ─────────────────────────────────────────
+  // ── Dynamic Leaderboard Engine ──────────────────────────
   static List<LeaderboardEntry> getLeaderboard() {
     final raw = _p.getString('leaderboard');
-    if (raw == null) return _defaultLeaderboard();
-    try {
-      final list = jsonDecode(raw) as List;
-      return list.map((j) => LeaderboardEntry(
-        playerName: j['playerName'] ?? 'Player',
-        countryCode: j['countryCode'] ?? 'US',
-        score: j['score'] ?? 0,
-        accuracy: (j['accuracy'] ?? 0.0).toDouble(),
-        brainPower: j['brainPower'] ?? j['iqScore'] ?? 100, 
-        date: DateTime.tryParse(j['date'] ?? '') ?? DateTime.now(),
-      )).toList();
-    } catch (_) { return _defaultLeaderboard(); }
+    List<LeaderboardEntry> board = [];
+    
+    if (raw != null) {
+      try {
+        final list = jsonDecode(raw) as List;
+        board = list.map((j) => LeaderboardEntry.fromJson(j)).toList();
+      } catch (_) {}
+    }
+
+    // FORCE 200 ENTRIES: Top up if we have less than 200 players
+    if (board.length < 200) {
+      int missing = 200 - board.length;
+      board.addAll(_generateBots(missing));
+      _saveLeaderboard(board);
+    }
+
+    // SIMULATE TIME PASSING EVERY 2 HOURS
+    final lastSimStr = _p.getString('last_bot_sim');
+    final now = DateTime.now();
+    if (lastSimStr != null) {
+      final lastSim = DateTime.tryParse(lastSimStr) ?? now;
+      final hoursPassed = now.difference(lastSim).inHours;
+      
+      if (hoursPassed >= 2) {
+        final rng = Random();
+        final cycles = hoursPassed ~/ 2; 
+        
+        bool ranksChanged = false;
+        for (var entry in board) {
+          if (!entry.isCurrentUser) {
+            // Give 40% of bots a sudden surge in points so ranks shuffle wildly
+            if (rng.nextDouble() > 0.6) {
+              entry.brainPower += rng.nextInt(6 * cycles) + 2;
+              entry.score += rng.nextInt(3 * cycles) + 1;
+              ranksChanged = true;
+            }
+          }
+        }
+        
+        _p.setString('last_bot_sim', now.toIso8601String());
+        if (ranksChanged) {
+          board.sort((a, b) => b.brainPower.compareTo(a.brainPower));
+          _saveLeaderboard(board);
+        }
+      }
+    } else {
+      _p.setString('last_bot_sim', now.toIso8601String());
+    }
+
+    board.sort((a, b) => b.brainPower.compareTo(a.brainPower));
+    return board;
   }
 
   static Future<void> addLeaderboardEntry(LeaderboardEntry entry) async {
     final board = getLeaderboard();
+    
+    // De-duplicate the current user
+    board.removeWhere((e) => e.isCurrentUser);
     board.add(entry);
-    
-    // Sort by Brain Power desc, keep top 100
     board.sort((a, b) => b.brainPower.compareTo(a.brainPower));
-    final trimmed = board.take(100).toList();
     
-    await _p.setString('leaderboard', jsonEncode(trimmed.map((e) => {
-      'playerName': e.playerName, 'countryCode': e.countryCode,
-      'score': e.score, 'accuracy': e.accuracy,
-      'brainPower': e.brainPower, 'date': e.date.toIso8601String(),
-    }).toList()));
+    // Ensure we keep exactly 200, but NEVER delete the current user
+    var trimmed = board.take(200).toList();
+    if (!trimmed.any((e) => e.isCurrentUser)) {
+      trimmed.removeLast();
+      trimmed.add(entry);
+      trimmed.sort((a, b) => b.brainPower.compareTo(a.brainPower));
+    }
+    
+    await _saveLeaderboard(trimmed);
   }
 
-  static List<LeaderboardEntry> _defaultLeaderboard() {
+  static Future<void> _saveLeaderboard(List<LeaderboardEntry> board) async {
+    await _p.setString('leaderboard', jsonEncode(board.map((e) => e.toJson()).toList()));
+  }
+
+  static List<LeaderboardEntry> _generateBots(int count) {
+    final rng = Random();
+    final countries = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'IN', 'PK', 'CN', 'JP', 'BR', 'ES', 'NL', 'SE', 'CH'];
+    final prefixes = ['Math', 'Calc', 'Quick', 'Brain', 'Smart', 'Fast', 'Pro', 'Elite', 'Mega', 'Super', 'Hyper', 'Quantum'];
+    final suffixes = ['Wiz', 'King', 'Kid', 'Master', 'Genius', 'Ninja', 'Bot', 'Star', 'Hero', 'Lord', 'Boss', 'Ace'];
+    
+    List<LeaderboardEntry> bots = [];
     final now = DateTime.now();
-    return [
-      LeaderboardEntry(playerName: 'MathWiz', countryCode: 'US', score: 18, accuracy: 0.94, brainPower: 142, date: now.subtract(const Duration(days: 1))),
-      LeaderboardEntry(playerName: 'QuickCalc', countryCode: 'CN', score: 17, accuracy: 0.91, brainPower: 138, date: now.subtract(const Duration(days: 2))),
-      LeaderboardEntry(playerName: 'NumberKing', countryCode: 'IN', score: 16, accuracy: 0.89, brainPower: 135, date: now.subtract(const Duration(days: 3))),
-      LeaderboardEntry(playerName: 'BrainStorm', countryCode: 'GB', score: 15, accuracy: 0.87, brainPower: 131, date: now.subtract(const Duration(days: 4))),
-      LeaderboardEntry(playerName: 'TugMaster', countryCode: 'PK', score: 14, accuracy: 0.85, brainPower: 128, date: now.subtract(const Duration(days: 5))),
-      LeaderboardEntry(playerName: 'AlgebraAce', countryCode: 'DE', score: 14, accuracy: 0.83, brainPower: 126, date: now.subtract(const Duration(days: 6))),
-      LeaderboardEntry(playerName: 'SpeedMath', countryCode: 'JP', score: 13, accuracy: 0.81, brainPower: 122, date: now.subtract(const Duration(days: 7))),
-      LeaderboardEntry(playerName: 'PullPower', countryCode: 'AU', score: 12, accuracy: 0.78, brainPower: 118, date: now.subtract(const Duration(days: 8))),
-      LeaderboardEntry(playerName: 'CalcKid', countryCode: 'CA', score: 11, accuracy: 0.75, brainPower: 114, date: now.subtract(const Duration(days: 9))),
-      LeaderboardEntry(playerName: 'RopeRacer', countryCode: 'FR', score: 10, accuracy: 0.72, brainPower: 110, date: now.subtract(const Duration(days: 10))),
-    ];
+
+    for (int i = 0; i < count; i++) {
+      String name = '${prefixes[rng.nextInt(prefixes.length)]}${suffixes[rng.nextInt(suffixes.length)]}${rng.nextInt(99)}';
+      String country = countries[rng.nextInt(countries.length)];
+      
+      int bp = 100 + rng.nextInt(50) - rng.nextInt(20); 
+      int score = (bp / 10).round() + rng.nextInt(5);
+      double acc = 0.60 + (rng.nextDouble() * 0.35);
+
+      bots.add(LeaderboardEntry(
+        playerName: name, countryCode: country, score: score, accuracy: acc,
+        brainPower: bp.clamp(80, 180), date: now.subtract(Duration(hours: rng.nextInt(72))), isCurrentUser: false,
+      ));
+    }
+    return bots;
   }
 
   static bool get isOnboardingComplete => getProfile().onboardingComplete;
@@ -166,8 +200,7 @@ class StorageService {
     if (last == null) {
       progress.streakDays = 1;
     } else {
-      final diff = DateTime(today.year, today.month, today.day)
-          .difference(DateTime(last.year, last.month, last.day)).inDays;
+      final diff = DateTime(today.year, today.month, today.day).difference(DateTime(last.year, last.month, last.day)).inDays;
       if (diff == 1) progress.streakDays += 1;
       else if (diff > 1) progress.streakDays = 1;
     }

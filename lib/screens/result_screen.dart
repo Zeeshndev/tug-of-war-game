@@ -64,7 +64,7 @@ class _ResultScreenState extends ConsumerState<ResultScreen> {
 
     final cfg = switch (outcome) {
       MatchOutcome.win  => (e: '🏆', title: 'You Win!',    col: AppTheme.yellowLight),
-      MatchOutcome.lose => (e: '😅', title: 'CPU Wins!',    col: AppTheme.textSecondary),
+      MatchOutcome.lose => (e: '😞', title: 'CPU Wins!',    col: AppTheme.textSecondary),
       MatchOutcome.draw => (e: '🤝', title: "It's a Draw!", col: AppTheme.blueLight),
     };
 

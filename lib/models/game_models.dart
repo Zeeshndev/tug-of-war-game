@@ -305,6 +305,7 @@ class LeaderboardEntry {
   double accuracy;
   int brainPower;
   DateTime date;
+  bool isCurrentUser; // Prevents duplicate entries
 
   LeaderboardEntry({
     required this.playerName,
@@ -313,7 +314,25 @@ class LeaderboardEntry {
     required this.accuracy,
     required this.brainPower,
     required this.date,
+    this.isCurrentUser = false,
   });
+
+  Map<String, dynamic> toJson() => {
+    'playerName': playerName, 'countryCode': countryCode,
+    'score': score, 'accuracy': accuracy,
+    'brainPower': brainPower, 'date': date.toIso8601String(),
+    'isCurrentUser': isCurrentUser,
+  };
+
+  factory LeaderboardEntry.fromJson(Map<String, dynamic> j) => LeaderboardEntry(
+    playerName: j['playerName'] ?? 'Player',
+    countryCode: j['countryCode'] ?? 'US',
+    score: j['score'] ?? 0,
+    accuracy: (j['accuracy'] ?? 0.0).toDouble(),
+    brainPower: j['brainPower'] ?? j['iqScore'] ?? 100, 
+    date: DateTime.tryParse(j['date'] ?? '') ?? DateTime.now(),
+    isCurrentUser: j['isCurrentUser'] ?? false,
+  );
 }
 
 // ── NEW DATA MODEL: DAILY QUESTS ───────────────────────────────

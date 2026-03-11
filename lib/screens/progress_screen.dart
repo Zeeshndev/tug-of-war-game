@@ -11,87 +11,128 @@ class ProgressScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(progressProvider);
-    final accuracy = progress.totalAnswered > 0
-        ? '${(progress.totalCorrect / progress.totalAnswered * 100).round()}%'
-        : '-';
+    final profile = ref.watch(profileProvider);
 
-    final total = progress.additionCorrect + progress.subtractionCorrect
-        + progress.multiplicationCorrect + progress.divisionCorrect;
-    final skills = [
-      (MathSkill.addition, '➕ Addition', progress.additionCorrect),
-      (MathSkill.subtraction, '➖ Subtraction', progress.subtractionCorrect),
-      (MathSkill.multiplication, '✖️ Multiplication', progress.multiplicationCorrect),
-      (MathSkill.division, '➗ Division', progress.divisionCorrect),
-    ];
+    final winRate = progress.totalGames > 0 ? (progress.totalWins / progress.totalGames) : 0.0;
+    final accuracy = progress.totalAnswered > 0 ? (progress.totalCorrect / progress.totalAnswered) : 0.0;
+    final avgSpeed = progress.totalQuestionsAnswered > 0 
+        ? (progress.totalResponseTimeMs / progress.totalQuestionsAnswered / 1000.0) 
+        : 0.0;
+
+    final totalSkills = progress.additionCorrect + progress.subtractionCorrect + progress.multiplicationCorrect + progress.divisionCorrect;
 
     return Scaffold(
+      backgroundColor: AppTheme.bg,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
+              // ── Header ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                child: Row(children: [
                   GestureDetector(
                     onTap: () => context.pop(),
-                    child: const Text('←', style: TextStyle(fontSize: 30, color: AppTheme.textPrimary)),
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(color: AppTheme.bg2, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.bg3)),
+                      child: const Center(child: Text('←', style: TextStyle(fontSize: 20, color: AppTheme.textPrimary))),
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  Text('📊 My Progress', style: AppTheme.display(26, color: AppTheme.blueLight)),
-                ],
+                  Text('📊 Player Stats', style: AppTheme.display(26, color: AppTheme.yellowLight)),
+                ]),
               ),
-              const SizedBox(height: 20),
 
-              GridView.count(
-                crossAxisCount: 2, shrinkWrap: true,
-                crossAxisSpacing: 12, mainAxisSpacing: 12,
-                childAspectRatio: 1.1,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _BigStat(emoji: '🏆', value: '${progress.totalWins}', label: 'Wins'),
-                  _BigStat(emoji: '🎮', value: '${progress.totalGames}', label: 'Matches'),
-                  _BigStat(emoji: '🔥', value: '${progress.bestStreak}', label: 'Best Streak'),
-                  _BigStat(emoji: '🎯', value: accuracy, label: 'Accuracy'),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              Text('Skill Breakdown', style: AppTheme.display(20)),
-              const SizedBox(height: 12),
-
-              ...skills.map((s) {
-                final (_, label, count) = s;
-                final pct = total > 0 ? (count / total) : 0.0;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _SkillRow(label: label, count: count, pct: pct.clamp(0.0, 1.0)),
-                );
-              }),
-
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppTheme.yellow.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radius),
-                  border: Border.all(color: AppTheme.yellow.withOpacity(0.3)),
-                ),
+              // ── Top Hero Stats ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    const Text('🪙', style: TextStyle(fontSize: 28)),
-                    const SizedBox(width: 10),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${progress.coins}',
-                            style: AppTheme.display(28, color: AppTheme.yellowLight)),
-                        Text('Total Coins', style: AppTheme.body(12, color: AppTheme.textSecondary)),
-                      ],
-                    ),
+                    _HeroStatCard(title: 'WIN RATE', value: '${(winRate * 100).round()}%', color: AppTheme.green, icon: '🏆'),
+                    const SizedBox(width: 12),
+                    _HeroStatCard(title: 'ACCURACY', value: '${(accuracy * 100).round()}%', color: AppTheme.blue, icon: '🎯'),
                   ],
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // ── Brain Power Metric ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [AppTheme.purple.withOpacity(0.4), AppTheme.blue.withOpacity(0.4)]),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.purple, width: 2),
+                  ),
+                  child: Column(
+                    children: [
+                      Text('🧠 ESTIMATED BRAIN POWER', style: AppTheme.body(12, color: Colors.white, weight: FontWeight.w900).copyWith(letterSpacing: 1.5)),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${calculateBrainPower(
+                          correct: progress.totalCorrect, answered: progress.totalAnswered, bestStreak: progress.bestStreak, 
+                          matchDuration: 60, totalResponseMs: progress.totalResponseTimeMs, responsesCount: progress.totalQuestionsAnswered
+                        )}', 
+                        style: AppTheme.display(64, color: Colors.white)
+                      ),
+                      const SizedBox(height: 4),
+                      Text('Based on Speed, Accuracy & Streaks', style: AppTheme.body(11, color: AppTheme.textSecondary)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // ── Skill Breakdown ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text('SKILL MASTERY', style: AppTheme.body(14, color: AppTheme.textSecondary, weight: FontWeight.w900).copyWith(letterSpacing: 1.2)),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: AppTheme.bg2, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.bg3)),
+                  child: Column(
+                    children: [
+                      _SkillBar(label: '➕ Addition', count: progress.additionCorrect, total: totalSkills, color: Colors.blue),
+                      const SizedBox(height: 12),
+                      _SkillBar(label: '➖ Subtraction', count: progress.subtractionCorrect, total: totalSkills, color: Colors.red),
+                      const SizedBox(height: 12),
+                      _SkillBar(label: '✖️ Multiplication', count: progress.multiplicationCorrect, total: totalSkills, color: Colors.purple),
+                      const SizedBox(height: 12),
+                      _SkillBar(label: '➗ Division', count: progress.divisionCorrect, total: totalSkills, color: Colors.orange),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // ── Quick Facts ──
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text('QUICK FACTS', style: AppTheme.body(14, color: AppTheme.textSecondary, weight: FontWeight.w900).copyWith(letterSpacing: 1.2)),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(child: _FactBox(label: 'Total Matches', value: '${progress.totalGames}')),
+                    const SizedBox(width: 10),
+                    Expanded(child: _FactBox(label: 'Best Streak', value: '${progress.bestStreak}')),
+                    const SizedBox(width: 10),
+                    Expanded(child: _FactBox(label: 'Avg Speed', value: '${avgSpeed.toStringAsFixed(1)}s')),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -100,68 +141,88 @@ class ProgressScreen extends ConsumerWidget {
   }
 }
 
-class _BigStat extends StatelessWidget {
-  final String emoji, value, label;
-  const _BigStat({required this.emoji, required this.value, required this.label});
+class _HeroStatCard extends StatelessWidget {
+  final String title, value, icon;
+  final Color color;
+  const _HeroStatCard({required this.title, required this.value, required this.color, required this.icon});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.bg2,
-        borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: AppTheme.bg3),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 32)),
-          const SizedBox(height: 6),
-          Text(value, style: AppTheme.display(32)),
-          Text(label.toUpperCase(), style: AppTheme.body(11, color: AppTheme.textSecondary)),
-        ],
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.5), width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(icon, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 6),
+                Text(title, style: AppTheme.body(11, color: color, weight: FontWeight.w900)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(value, style: AppTheme.display(28, color: Colors.white)),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _SkillRow extends StatelessWidget {
+class _SkillBar extends StatelessWidget {
   final String label;
-  final int count;
-  final double pct;
+  final int count, total;
+  final Color color;
+  const _SkillBar({required this.label, required this.count, required this.total, required this.color});
 
-  const _SkillRow({required this.label, required this.count, required this.pct});
+  @override
+  Widget build(BuildContext context) {
+    final pct = total > 0 ? (count / total).clamp(0.0, 1.0) : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: AppTheme.body(13, color: AppTheme.textPrimary, weight: FontWeight.w800)),
+            Text('$count correct', style: AppTheme.body(11, color: AppTheme.textSecondary)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Stack(
+          children: [
+            Container(height: 10, decoration: BoxDecoration(color: AppTheme.bg3, borderRadius: BorderRadius.circular(5))),
+            FractionallySizedBox(
+              widthFactor: pct,
+              child: Container(height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(5))),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FactBox extends StatelessWidget {
+  final String label, value;
+  const _FactBox({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.bg2,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.bg3),
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(color: AppTheme.bg2, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.bg3)),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label, style: AppTheme.body(14, weight: FontWeight.w800)),
-              Text('$count correct', style: AppTheme.body(13, color: AppTheme.blueLight)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(5),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 10,
-              backgroundColor: AppTheme.bg3,
-              valueColor: const AlwaysStoppedAnimation(AppTheme.blueLight),
-            ),
-          ),
+          Text(value, style: AppTheme.display(20, color: AppTheme.yellowLight)),
+          const SizedBox(height: 4),
+          Text(label, style: AppTheme.body(10, color: AppTheme.textSecondary)),
         ],
       ),
     );
