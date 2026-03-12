@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'services/storage_service.dart';
+import 'services/ad_service.dart'; // Import the new service
 import 'services/audio_service.dart';
 import 'utils/theme.dart';
 import 'utils/router.dart';
@@ -18,6 +19,9 @@ Future<void> main() async {
   ));
   
   await StorageService.init();
+  
+  // MUST BOOT AD ENGINE BEFORE RUNNING APP
+  await AdService().initialize(); 
   
   // Sync sound enabled state from saved profile immediately on startup
   AudioService().soundEnabled = StorageService.getProfile().soundOn;
@@ -63,7 +67,7 @@ class _TugOfWarAppState extends State<TugOfWarApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Tug of War: Mathematics',
+      title: 'BrainTug: Epic Math Battles',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.themeData,
       routerConfig: AppRouter.router,

@@ -30,6 +30,7 @@ dependencies:
   # Icons
   cupertino_icons: ^1.0.8
   just_audio: ^0.10.5
+  google_mobile_ads: ^7.0.0
 
 dev_dependencies:
   flutter_test:
