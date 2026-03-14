@@ -3,12 +3,13 @@ import '../screens/splash_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/game_screen.dart';
-import '../screens/result_screen.dart'; // <-- Added this back!
+import '../screens/result_screen.dart';
 import '../screens/shop_screen.dart';
 import '../screens/leaderboard_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/countdown_screen.dart';
-
+import '../screens/settings_screen.dart'; // Make sure this file exists!
+import '../screens/adventure_screen.dart'; // <-- Import new screen
 class AppRouter {
   static final router = GoRouter(
     initialLocation: '/', 
@@ -30,7 +31,7 @@ class AppRouter {
         builder: (context, state) => const GameScreen(),
       ),
       GoRoute(
-        path: '/result', // <-- Added the Result route back!
+        path: '/result',
         builder: (context, state) => const ResultScreen(),
       ),
       GoRoute(
@@ -51,8 +52,9 @@ class AppRouter {
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const settings(),
+        builder: (context, state) => const SettingsScreen(), // Fixed capitalization here!
       ),
+      GoRoute(path: '/adventure', builder: (context, state) => const AdventureScreen()),
     ],
   );
 }
