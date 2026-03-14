@@ -6,6 +6,7 @@ import '../screens/shop_screen.dart';
 import '../screens/leaderboard_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/countdown_screen.dart';
+import '../screens/onboarding_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
@@ -18,7 +19,7 @@ class AppRouter {
       GoRoute(
         path: '/onboarding',
         // Fallback to Home temporarily. We will replace this with OnboardingScreen in UC-002.
-        builder: (context, state) => const HomeScreen(), 
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/home',
