@@ -1,16 +1,17 @@
 import 'package:go_router/go_router.dart';
 import '../screens/splash_screen.dart';
+import '../screens/onboarding_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/game_screen.dart';
+import '../screens/result_screen.dart'; // <-- Added this back!
 import '../screens/shop_screen.dart';
 import '../screens/leaderboard_screen.dart';
 import '../screens/progress_screen.dart';
 import '../screens/countdown_screen.dart';
-import '../screens/onboarding_screen.dart';
 
 class AppRouter {
   static final router = GoRouter(
-    initialLocation: '/', // App now boots directly into the Splash Screen
+    initialLocation: '/', 
     routes: [
       GoRoute(
         path: '/',
@@ -18,7 +19,6 @@ class AppRouter {
       ),
       GoRoute(
         path: '/onboarding',
-        // Fallback to Home temporarily. We will replace this with OnboardingScreen in UC-002.
         builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
@@ -28,6 +28,10 @@ class AppRouter {
       GoRoute(
         path: '/game',
         builder: (context, state) => const GameScreen(),
+      ),
+      GoRoute(
+        path: '/result', // <-- Added the Result route back!
+        builder: (context, state) => const ResultScreen(),
       ),
       GoRoute(
         path: '/shop',
@@ -44,6 +48,10 @@ class AppRouter {
       GoRoute(
         path: '/countdown',
         builder: (context, state) => const CountdownScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const settings(),
       ),
     ],
   );

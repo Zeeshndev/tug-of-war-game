@@ -26,6 +26,10 @@ class _GameScreenState extends ConsumerState<GameScreen>
   bool _showComboText = false;
   String _comboMessage = "";
 
+  // ── End Game Animation Controllers (UC-004) ──
+  bool _showEndAnimation = false;
+  String _endState = ''; // 'win', 'lose', or 'draw'
+
   @override
   void initState() {
     super.initState();
@@ -93,6 +97,30 @@ class _GameScreenState extends ConsumerState<GameScreen>
     });
   }
 
+  // ── Trigger End Game Animation (UC-004) ──
+  void _triggerEndAnimation(GameSession session) {
+    if (!mounted) return;
+
+    String outcome;
+    if (session.ropePosition <= -10.0 || (session.timeLeft == 0 && session.ropePosition < 0)) {
+      outcome = 'win';
+    } else if (session.ropePosition >= 10.0 || (session.timeLeft == 0 && session.ropePosition > 0)) {
+      outcome = 'lose';
+    } else {
+      outcome = 'draw';
+    }
+
+    setState(() {
+      _endState = outcome;
+      _showEndAnimation = true;
+    });
+
+    // Wait 1.5 seconds, then navigate to result screen
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) context.go('/result');
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(gameProvider);
@@ -101,7 +129,8 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // Listen for state changes to trigger navigation OR combo animations
     ref.listen(gameProvider, (prev, next) {
       if (prev?.active == true && !next.active) {
-        Future.microtask(() { if (mounted) context.go('/result'); });
+        // Trigger end match animation instead of instant navigation
+        _triggerEndAnimation(next);
       }
 
       // Check if a combo milestone was just hit
@@ -246,8 +275,80 @@ class _GameScreenState extends ConsumerState<GameScreen>
                     },
                   ),
                 ),
+
+              // ── END GAME ANIMATION OVERLAY (UC-004) ──
+              _buildEndAnimationOverlay(),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEndAnimationOverlay() {
+    if (!_showEndAnimation) return const SizedBox.shrink();
+
+    String title;
+    Color color;
+    String emoji;
+
+    switch (_endState) {
+      case 'win':
+        title = 'YOU WIN!';
+        color = AppTheme.green;
+        emoji = '🏆 🎉';
+        break;
+      case 'lose':
+        title = 'CPU WINS!';
+        color = AppTheme.red;
+        emoji = '😢';
+        break;
+      case 'draw':
+      default:
+        title = 'IT\'S A DRAW!';
+        color = AppTheme.yellow;
+        emoji = '🤝';
+        break;
+    }
+
+    return Container(
+      color: Colors.black.withOpacity(0.7), 
+      width: double.infinity,
+      height: double.infinity,
+      child: Center(
+        child: TweenAnimationBuilder<double>(
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.elasticOut,
+          tween: Tween<double>(begin: 0.0, end: 1.0),
+          builder: (context, scale, child) {
+            return Transform.scale(
+              scale: scale,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(emoji, style: const TextStyle(fontSize: 80)),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(color: color.withOpacity(0.5), blurRadius: 20, spreadRadius: 5)
+                      ]
+                    ),
+                    child: Text(
+                      title,
+                      style: AppTheme.display(42, color: Colors.white).copyWith(
+                        letterSpacing: 2,
+                        shadows: const [Shadow(color: Colors.black45, blurRadius: 4, offset: Offset(0, 4))]
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
