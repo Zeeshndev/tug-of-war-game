@@ -35,7 +35,6 @@ class AdventureScreen extends ConsumerStatefulWidget {
 class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTickerProviderStateMixin {
   late AnimationController _bgAnimController;
 
-  // Curriculum-aligned worlds (UC-008)
   final List<WorldData> _worlds = [
     WorldData(id: 'w1', name: 'Forest of Addition', subtitle: 'Year 1 • Single Digit', emoji: '🌲', primaryColor: const Color(0xFF22C55E), secondaryColor: const Color(0xFF166534), mode: GameMode.additionOnly),
     WorldData(id: 'w2', name: 'Subtraction Swamp', subtitle: 'Year 2 • Double Digit', emoji: '🐊', primaryColor: const Color(0xFF8B5CF6), secondaryColor: const Color(0xFF4C1D95), mode: GameMode.subtractionOnly),
@@ -47,7 +46,6 @@ class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    // Looping background animation (Clouds / Stars moving)
     _bgAnimController = AnimationController(vsync: this, duration: const Duration(seconds: 20))..repeat();
   }
 
@@ -104,30 +102,17 @@ class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTi
     final progress = ref.watch(progressProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF87CEEB), // Sky blue base
+      backgroundColor: const Color(0xFF87CEEB), 
       body: Stack(
         children: [
-          // ── Animated Background ──
           AnimatedBuilder(
             animation: _bgAnimController,
             builder: (context, child) {
               return Stack(
                 children: [
-                  Positioned(
-                    left: -200 + (_bgAnimController.value * 400),
-                    top: 100,
-                    child: const Text('☁️', style: TextStyle(fontSize: 100, color: Colors.white54)),
-                  ),
-                  Positioned(
-                    right: -100 + (_bgAnimController.value * 300),
-                    top: 250,
-                    child: const Text('☁️', style: TextStyle(fontSize: 80, color: Colors.white54)),
-                  ),
-                  Positioned(
-                    left: -50 + (_bgAnimController.value * 200),
-                    top: 500,
-                    child: const Text('☁️', style: TextStyle(fontSize: 120, color: Colors.white54)),
-                  ),
+                  Positioned(left: -200 + (_bgAnimController.value * 400), top: 100, child: const Text('☁️', style: TextStyle(fontSize: 100, color: Colors.white54))),
+                  Positioned(right: -100 + (_bgAnimController.value * 300), top: 250, child: const Text('☁️', style: TextStyle(fontSize: 80, color: Colors.white54))),
+                  Positioned(left: -50 + (_bgAnimController.value * 200), top: 500, child: const Text('☁️', style: TextStyle(fontSize: 120, color: Colors.white54))),
                 ],
               );
             },
@@ -136,7 +121,6 @@ class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTi
           SafeArea(
             child: Column(
               children: [
-                // ── Top HUD ──
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
@@ -159,15 +143,20 @@ class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTi
                 )),
                 const SizedBox(height: 20),
 
-                // ── Worlds List ──
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                     itemCount: _worlds.length,
                     itemBuilder: (context, index) {
                       final world = _worlds[index];
-                      // Alternate alignment for winding path look
                       final isLeft = index % 2 == 0; 
+                      
+                      // 🚨 FIX: Calculate real progress bar completion!
+                      int worldStars = 0;
+                      for(int i = 1; i <= world.totalLevels; i++) {
+                        worldStars += progress.adventureStars['${world.mode.name}_$i'] ?? 0;
+                      }
+                      double progressFactor = worldStars / (world.totalLevels * 3);
                       
                       return Align(
                         alignment: isLeft ? Alignment.centerLeft : Alignment.centerRight,
@@ -180,9 +169,7 @@ class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTi
                               gradient: LinearGradient(colors: [world.primaryColor, world.secondaryColor], begin: Alignment.topLeft, end: Alignment.bottomRight),
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(color: Colors.white.withOpacity(0.3), width: 3),
-                              boxShadow: [
-                                BoxShadow(color: world.secondaryColor.withOpacity(0.5), blurRadius: 15, offset: const Offset(0, 8))
-                              ]
+                              boxShadow: [BoxShadow(color: world.secondaryColor.withOpacity(0.5), blurRadius: 15, offset: const Offset(0, 8))]
                             ),
                             child: Stack(
                               clipBehavior: Clip.none,
@@ -199,13 +186,13 @@ class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTi
                                       Text(world.subtitle, style: AppTheme.body(14, color: Colors.white)),
                                       const SizedBox(height: 16),
                                       
-                                      // Progress Bar Mock
+                                      // Real Progress Bar
                                       Container(
                                         height: 8, width: double.infinity,
                                         decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(4)),
                                         child: FractionallySizedBox(
                                           alignment: Alignment.centerLeft,
-                                          widthFactor: index == 0 ? 0.4 : 0.0, // Mock progress
+                                          widthFactor: progressFactor, // Real dynamic width
                                           child: Container(decoration: BoxDecoration(color: AppTheme.yellow, borderRadius: BorderRadius.circular(4))),
                                         ),
                                       )
@@ -246,13 +233,14 @@ class _AdventureScreenState extends ConsumerState<AdventureScreen> with SingleTi
   }
 }
 
-// ── Sliding Level Selector Sheet ──
 class _LevelSelectorSheet extends ConsumerWidget {
   final WorldData world;
   const _LevelSelectorSheet({required this.world});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final progress = ref.watch(progressProvider); // Get the real saved data
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: BoxDecoration(
@@ -278,9 +266,17 @@ class _LevelSelectorSheet extends ConsumerWidget {
               itemCount: world.totalLevels,
               itemBuilder: (context, index) {
                 final levelNum = index + 1;
-                // Mock logic: Level 1 and 2 unlocked, rest locked
-                final isUnlocked = index < 2;
                 final isBoss = levelNum == world.totalLevels;
+
+                // 🚨 FIX: Fetch the actual stars from Riverpod Memory
+                final currentKey = '${world.mode.name}_$levelNum';
+                final prevKey = '${world.mode.name}_${levelNum - 1}';
+                
+                final currentStars = progress.adventureStars[currentKey] ?? 0;
+                final prevStars = progress.adventureStars[prevKey] ?? 0;
+                
+                // Unlocked if it is Level 1, OR if you earned at least 1 star on the previous level
+                final isUnlocked = levelNum == 1 || prevStars > 0;
 
                 return GestureDetector(
                   onTap: () {
@@ -294,18 +290,13 @@ class _LevelSelectorSheet extends ConsumerWidget {
                       return;
                     }
 
-                    // 1. Close Sheet
                     Navigator.pop(context);
-                    
-                    // 2. Set Game Configuration (UC-008)
                     ref.read(settingsProvider.notifier).setGameMode(world.mode);
                     ref.read(matchConfigProvider.notifier).state = {
                       'isAdventure': true,
                       'level': levelNum,
                       'isBoss': isBoss
                     };
-
-                    // 3. Navigate to Countdown
                     context.go('/countdown');
                   },
                   child: Column(
@@ -326,13 +317,13 @@ class _LevelSelectorSheet extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      // Mock Stars
+                      // 🚨 FIX: Draw real earned stars!
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.star, size: 16, color: index == 0 ? AppTheme.yellow : AppTheme.bg3),
-                          Icon(Icons.star, size: 16, color: index == 0 ? AppTheme.yellow : AppTheme.bg3),
-                          Icon(Icons.star, size: 16, color: AppTheme.bg3),
+                          Icon(Icons.star, size: 16, color: currentStars >= 1 ? AppTheme.yellow : AppTheme.bg3),
+                          Icon(Icons.star, size: 16, color: currentStars >= 2 ? AppTheme.yellow : AppTheme.bg3),
+                          Icon(Icons.star, size: 16, color: currentStars >= 3 ? AppTheme.yellow : AppTheme.bg3),
                         ],
                       )
                     ],
