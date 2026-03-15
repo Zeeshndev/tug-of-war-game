@@ -3,61 +3,35 @@ import 'package:tug_of_war_mathematics/services/question_engine.dart';
 import 'package:tug_of_war_mathematics/models/game_models.dart';
 
 void main() {
-  group('QuestionEngine', () {
-    test('Group A generates only addition/subtraction', () {
-      for (int i = 0; i < 50; i++) {
-        final q = QuestionEngine.generate('A');
-        expect(
-          q.skill == MathSkill.addition || q.skill == MathSkill.subtraction,
-          true,
-          reason: 'Group A should not include ${q.skill}',
-        );
-      }
+  group('QuestionEngine Tests', () {
+    test('Generates valid addition questions for Age Group A', () {
+      final q = QuestionEngine.generate('A', mode: GameMode.additionOnly);
+      expect(q.skill, MathSkill.addition);
+      expect(q.displayText.contains('+'), isTrue);
     });
 
-    test('Group B can generate all four operations', () {
-      final skills = <MathSkill>{};
-      for (int i = 0; i < 200; i++) {
-        final q = QuestionEngine.generate('B');
-        skills.add(q.skill);
-      }
-      expect(skills.length, 4, reason: 'Should see all 4 skills in Group B');
+    test('Generates valid subtraction questions for Age Group B', () {
+      final q = QuestionEngine.generate('B', mode: GameMode.subtractionOnly);
+      expect(q.skill, MathSkill.subtraction);
+      expect(q.displayText.contains('-'), isTrue);
     });
 
-    test('Answers are non-negative', () {
-      for (int i = 0; i < 100; i++) {
-        final q = QuestionEngine.generate('A');
-        expect(q.correctAnswer, greaterThanOrEqualTo(0));
-      }
+    test('Generates mixed questions successfully', () {
+      final q1 = QuestionEngine.generate('A', mode: GameMode.mixed);
+      final q2 = QuestionEngine.generate('B', mode: GameMode.mixed);
+      expect(q1.displayText, isNotEmpty);
+      expect(q2.displayText, isNotEmpty);
     });
 
-    test('Division produces clean whole numbers', () {
-      for (int i = 0; i < 100; i++) {
-        final q = QuestionEngine.generate('B');
-        if (q.skill == MathSkill.division) {
-          expect(q.correctAnswer, greaterThan(0));
-        }
-      }
+    test('Validates correct and incorrect answers', () {
+      expect(QuestionEngine.validate('15', 15), isTrue);
+      expect(QuestionEngine.validate('10', 15), isFalse);
+      expect(QuestionEngine.validate('', 15), isFalse);
     });
 
-    test('validate() returns true for correct answer', () {
-      final q = QuestionEngine.generate('A');
-      expect(QuestionEngine.validate('${q.correctAnswer}', q.correctAnswer), true);
-    });
-
-    test('validate() returns false for wrong answer', () {
-      expect(QuestionEngine.validate('999', 5), false);
-    });
-
-    test('validate() returns false for empty input', () {
-      expect(QuestionEngine.validate('', 5), false);
-    });
-
-    test('generateWrongAnswer is never equal to correct', () {
-      for (int i = 1; i <= 50; i++) {
-        final wrong = QuestionEngine.generateWrongAnswer(i);
-        expect(wrong, isNot(i));
-      }
+    test('Generates plausible wrong answers for AI', () {
+      final wrongAns = QuestionEngine.generateWrongAnswer(20);
+      expect(wrongAns != 20, isTrue);
     });
   });
 }

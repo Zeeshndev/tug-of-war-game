@@ -7,7 +7,8 @@ import 'package:tug_of_war_mathematics/models/game_models.dart';
 
 void main() {
   void setMobileScreenSize(WidgetTester tester) {
-    tester.view.physicalSize = const Size(1170, 2532);
+    // Widened width to 1500 to prevent headless font rendering from triggering sub-pixel overflows
+    tester.view.physicalSize = const Size(1500, 2532);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
@@ -34,12 +35,11 @@ void main() {
       ),
     );
 
-    // 🚨 FIX: Explicitly tick the Future.delayed timers forward to avoid pending timer crash
-    await tester.pump(const Duration(milliseconds: 500)); // Initial delay
-    await tester.pump(const Duration(milliseconds: 400)); // Star 1 delay
-    await tester.pump(const Duration(milliseconds: 400)); // Star 2 delay
-    await tester.pump(const Duration(milliseconds: 400)); // Star 3 delay
-    await tester.pumpAndSettle(); // Finish any remaining visual animations
+    await tester.pump(const Duration(milliseconds: 500)); 
+    await tester.pump(const Duration(milliseconds: 400)); 
+    await tester.pump(const Duration(milliseconds: 400)); 
+    await tester.pump(const Duration(milliseconds: 400)); 
+    await tester.pumpAndSettle(); 
 
     expect(find.text('Level 1 Complete!'), findsOneWidget);
     expect(find.text('🎉 NEW RECORD! 🎉'), findsOneWidget);
@@ -65,7 +65,6 @@ void main() {
       ),
     );
 
-    // 🚨 FIX: Explicitly tick the initial Future.delayed timer forward
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
