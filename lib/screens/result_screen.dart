@@ -1,474 +1,312 @@
-import 'package:confetti/confetti.dart';
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/app_providers.dart';
-import '../models/game_models.dart';
 import '../utils/theme.dart';
 import '../widgets/common_widgets.dart';
 import '../services/audio_service.dart';
 
 class ResultScreen extends ConsumerStatefulWidget {
   const ResultScreen({super.key});
+
   @override
   ConsumerState<ResultScreen> createState() => _ResultScreenState();
 }
 
-class _ResultScreenState extends ConsumerState<ResultScreen> {
-  late ConfettiController _confetti;
-  int _brainPower = 100;
+class _ResultScreenState extends ConsumerState<ResultScreen> with TickerProviderStateMixin {
+  bool _showStar1 = false;
+  bool _showStar2 = false;
+  bool _showStar3 = false;
+  bool _showConfetti = false;
 
   @override
   void initState() {
     super.initState();
-    _confetti = ConfettiController(duration: const Duration(seconds: 4));
+    // Start the UC-009 stagger animation sequence after screen loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final s   = ref.read(gameProvider);
-      final dur = ref.read(settingsProvider).matchDuration;
-      final prog= ref.read(progressProvider);
-      final power  = calculateBrainPower(
-        correct:         s.sessionCorrect,
-        answered:        s.sessionAnswered,
-        bestStreak:      s.sessionBestStreak,
-        matchDuration:   dur,
-        totalResponseMs: prog.totalResponseTimeMs,
-        responsesCount:  prog.totalQuestionsAnswered,
-      );
-      setState(() => _brainPower = power);
-      if (_outcome(s) == MatchOutcome.win) _confetti.play();
+      _runStarSequence();
     });
   }
 
-  @override
-  void dispose() { _confetti.dispose(); super.dispose(); }
+  Future<void> _runStarSequence() async {
+    final session = ref.read(gameProvider);
+    final isAdv = ref.read(matchConfigProvider)['isAdventure'] == true;
+    
+    if (!isAdv) return; // Quick play doesn't do star animations
 
-  MatchOutcome _outcome(GameSession s) {
-    if (s.playerScore > s.aiScore) return MatchOutcome.win;
-    if (s.aiScore > s.playerScore) return MatchOutcome.lose;
-    return MatchOutcome.draw;
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
+    // Star 1
+    if (session.starsEarned >= 1) {
+      setState(() => _showStar1 = true);
+      AudioService().playKey(); // Star sound
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
+    if (!mounted) return;
+
+    // Star 2
+    if (session.starsEarned >= 2) {
+      setState(() => _showStar2 = true);
+      AudioService().playKey();
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
+    if (!mounted) return;
+
+    // Star 3
+    if (session.starsEarned >= 3) {
+      setState(() => _showStar3 = true);
+      AudioService().playKey();
+      await Future.delayed(const Duration(milliseconds: 400));
+    }
+    
+    // New Record Confetti
+    if (session.isNewRecord && session.starsEarned > 0) {
+      setState(() => _showConfetti = true);
+      AudioService().playCorrect(); // Celebratory chime
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final s       = ref.watch(gameProvider);
-    final prog    = ref.watch(progressProvider);
-    final profile = ref.watch(profileProvider);
-    final outcome = _outcome(s);
-    final dur     = ref.read(settingsProvider).matchDuration;
+    final session = ref.watch(gameProvider);
+    final config = ref.watch(matchConfigProvider);
+    final isAdventure = config['isAdventure'] == true;
+    final levelNum = config['level'] as int? ?? 1;
 
-    final answered = s.sessionAnswered;
-    final accPct   = answered == 0 ? '0%'
-        : '${(s.sessionCorrect / answered * 100).round()}%';
-    final cpm      = dur == 0 ? 0 : (s.sessionCorrect * 60 / dur).round();
-
-    final cfg = switch (outcome) {
-      MatchOutcome.win  => (e: '🏆', title: 'You Win!',    col: AppTheme.yellowLight),
-      MatchOutcome.lose => (e: '😞', title: 'CPU Wins!',    col: AppTheme.textSecondary),
-      MatchOutcome.draw => (e: '🤝', title: "It's a Draw!", col: AppTheme.blueLight),
-    };
+    final bool won = session.playerWinningByRope || session.playerScore > session.aiScore;
+    final String title = isAdventure 
+      ? (won ? 'Level $levelNum Complete!' : 'Level $levelNum Failed')
+      : (won ? 'You Won!' : 'Good Try!');
 
     return Scaffold(
       backgroundColor: AppTheme.bg,
-      body: Stack(children: [
-        // Confetti
-        Align(
-          alignment: Alignment.topCenter,
-          child: ConfettiWidget(
-            confettiController: _confetti,
-            blastDirectionality: BlastDirectionality.explosive,
-            colors: const [AppTheme.yellow, AppTheme.red, AppTheme.blue,
-                           AppTheme.green, AppTheme.purple],
-            numberOfParticles: 40,
-          ),
-        ),
-
-        SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
-            child: Column(children: [
-
-              // ── Outcome ─────────────────────────────────────────────
-              Text(cfg.e, style: const TextStyle(fontSize: 80)),
-              const SizedBox(height: 4),
-              Text(cfg.title, style: AppTheme.display(44, color: cfg.col)),
-              Text('${profile.playerName} · ${_flag(profile.countryCode)}',
-                  style: AppTheme.body(13, color: AppTheme.textSecondary)),
-              const SizedBox(height: 18),
-
-              // ── Brain Power Card ─────────────────────────────────────
-              _BrainPowerCard(power: _brainPower),
-              const SizedBox(height: 12),
-
-              // ── Score row ────────────────────────────────────────────
-              Row(children: [
-                Expanded(child: _Stat('${s.playerScore}', 'Your Score', AppTheme.blue)),
-                const SizedBox(width: 10),
-                Expanded(child: _Stat('${s.aiScore}',     'CPU Score',  AppTheme.red)),
-              ]),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            children: [
+              // Title Banner
+              Text(
+                title, 
+                // FIXED: Using built-in Colors.orange instead of AppTheme.orange
+                style: AppTheme.display(36, color: won ? AppTheme.green : Colors.orange),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 10),
-
-              // ── Performance stats ─────────────────────────────────────
-              Row(children: [
-                Expanded(child: _Stat(accPct,  'Accuracy', AppTheme.green)),
-                const SizedBox(width: 10),
-                Expanded(child: _Stat('${s.sessionBestStreak}🔥', 'Best Streak', AppTheme.yellow)),
-              ]),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: _Stat('$cpm/min', 'Speed', AppTheme.purple)),
-                const SizedBox(width: 10),
-                Expanded(child: _Stat('${s.sessionCorrect}/${s.sessionAnswered}',
-                    'Correct / Total', AppTheme.blueLight)),
-              ]),
-              const SizedBox(height: 10),
-
-              // ── Skill breakdown ────────────────────────────────────────
-              _SkillBreakdown(prog: prog),
-              const SizedBox(height: 12),
-
-              // ── Coins ─────────────────────────────────────────────────
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                decoration: BoxDecoration(
-                  color: AppTheme.yellow.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.yellow.withOpacity(0.35), width: 2),
+              
+              // ── ADVENTURE MODE STARS (UC-009) ──
+              if (isAdventure)
+                SizedBox(
+                  height: 150,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _AnimatedStar(visible: _showStar1, delayMs: 0),
+                          const SizedBox(width: 10),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 40),
+                            child: _AnimatedStar(visible: _showStar2, delayMs: 100),
+                          ),
+                          const SizedBox(width: 10),
+                          _AnimatedStar(visible: _showStar3, delayMs: 200),
+                        ],
+                      ),
+                      if (_showConfetti)
+                        const Positioned(
+                          bottom: 0,
+                          child: _ConfettiBurst(),
+                        )
+                    ],
+                  ),
                 ),
-                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Text('🪙', style: TextStyle(fontSize: 32)),
-                  const SizedBox(width: 10),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('+${s.coinsEarned}',
-                        style: AppTheme.display(28, color: AppTheme.yellowLight)),
-                    Text('Coins Earned', style: AppTheme.body(11, color: AppTheme.textSecondary)),
-                  ]),
-                  const SizedBox(width: 24),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${prog.coins}', style: AppTheme.display(22, color: AppTheme.yellowLight)),
-                    Text('Total', style: AppTheme.body(11, color: AppTheme.textSecondary)),
-                  ]),
-                ]),
-              ),
-              const SizedBox(height: 14),
 
-              // ── Share card ─────────────────────────────────────────────
-              _ShareCard(
-                outcome: outcome, power: _brainPower, accPct: accPct,
-                score: s.playerScore, streak: s.sessionBestStreak, cpm: cpm,
-                playerName: profile.playerName, countryCode: profile.countryCode,
-              ),
-              const SizedBox(height: 18),
+              // Try again message if 0 stars
+              if (isAdventure && !won)
+                Padding(
+                  padding: const EdgeInsets.only(top: 20, bottom: 20),
+                  child: Text(
+                    "Try Again? You can do it! 💪", 
+                    style: AppTheme.body(18, color: AppTheme.textSecondary)
+                  ),
+                ),
 
-              // ── Actions ────────────────────────────────────────────────
-              BigButton(
-                label: '🔄 Play Again',
-                onTap: () {
-                  AudioService().setBgmState(BgmState.menu);
-                  context.go('/countdown');
-                },
-                color: AppTheme.green,
-                shadowColor: const Color(0xFF15803D),
+              const SizedBox(height: 20),
+
+              // Match Stats
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: AppTheme.bg2,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppTheme.bg3, width: 2),
+                ),
+                child: Column(
+                  children: [
+                    _StatRow(label: 'Accuracy', value: session.accuracy),
+                    const Divider(color: AppTheme.bg3, height: 24, thickness: 2),
+                    _StatRow(label: 'Best Streak', value: '${session.sessionBestStreak}🔥'),
+                    const Divider(color: AppTheme.bg3, height: 24, thickness: 2),
+                    _StatRow(
+                      label: 'Coins Earned', 
+                      value: '+${session.coinsEarned}', 
+                      valueColor: AppTheme.yellow,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              Row(children: [
-                Expanded(child: GhostButton(
-                    label: '🏆 Leaderboard',
+              const Spacer(),
+
+              // Next Level Preview (UC-009)
+              if (isAdventure && won)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(50),
+                    border: Border.all(color: AppTheme.blueLight, width: 2),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock_open, color: AppTheme.blueLight),
+                      const SizedBox(width: 8),
+                      Text('Level ${levelNum + 1} Unlocked!', style: AppTheme.body(16, color: AppTheme.blueLight, weight: FontWeight.w800)),
+                    ],
+                  ),
+                ),
+
+              // Buttons
+              if (isAdventure) ...[
+                if (won)
+                  BigButton(
+                    label: 'Next Level ▶',
                     onTap: () {
-                      AudioService().setBgmState(BgmState.menu);
-                      context.push('/leaderboard');
-                    })),
-                const SizedBox(width: 10),
-                Expanded(child: GhostButton(
-                    label: '🏠 Home',
-                    onTap: () {
-                      AudioService().setBgmState(BgmState.menu);
-                      context.go('/home');
-                    })),
-              ]),
-            ]),
+                      ref.read(matchConfigProvider.notifier).state = {
+                        ...config,
+                        'level': levelNum + 1,
+                      };
+                      context.go('/countdown');
+                    },
+                    color: AppTheme.green,
+                    shadowColor: const Color(0xFF15803D),
+                  ),
+                if (!won)
+                  BigButton(
+                    label: 'Try Again 🔄',
+                    onTap: () => context.go('/countdown'),
+                    // FIXED: Using built-in Colors.orange instead of AppTheme.orange
+                    color: Colors.orange,
+                    shadowColor: const Color(0xFFC2410C),
+                  ),
+                const SizedBox(height: 12),
+                BigButton(
+                  label: 'World Map 🗺️',
+                  onTap: () => context.go('/adventure'),
+                  color: AppTheme.blue,
+                  shadowColor: const Color(0xFF1E3A8A),
+                ),
+              ] else ...[
+                // Quick Play Buttons
+                BigButton(
+                  label: 'Play Again 🔄',
+                  onTap: () => context.go('/countdown'),
+                  color: AppTheme.green,
+                  shadowColor: const Color(0xFF15803D),
+                ),
+                const SizedBox(height: 12),
+                GhostButton(label: '🏠 Return Home', onTap: () => context.go('/home')),
+              ]
+            ],
           ),
         ),
-      ]),
-    );
-  }
-
-  String _flag(String code) {
-    if (code.length != 2) return '🌍';
-    final b = 0x1F1E6 - 65;
-    final c = code.toUpperCase().codeUnits;
-    return String.fromCharCode(b + c[0]) + String.fromCharCode(b + c[1]);
-  }
-}
-
-// ── Brain Power Card ─────────────────────────────────────────────────────────
-class _BrainPowerCard extends StatelessWidget {
-  final int power;
-  const _BrainPowerCard({required this.power});
-
-  @override
-  Widget build(BuildContext context) {
-    final col = power >= 130 ? AppTheme.yellowLight
-              : power >= 110 ? AppTheme.greenLight
-              : AppTheme.blueLight;
-    final label = _label(power);
-
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [col.withOpacity(0.16), col.withOpacity(0.05)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: col.withOpacity(0.45), width: 2),
       ),
-      child: Row(children: [
-        const Text('🧠', style: TextStyle(fontSize: 46)),
-        const SizedBox(width: 16),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('BRAIN POWER', style: AppTheme.body(10, color: col, weight: FontWeight.w900)),
-          Text('$power', style: AppTheme.display(54, color: col)),
-          Text(label, style: AppTheme.body(13, color: col.withOpacity(0.85))),
-        ])),
-        Column(children: [
-          _PowerBar(power: power),
-          const SizedBox(height: 4),
-          Text('Max: 160', style: AppTheme.body(9, color: AppTheme.textSecondary)),
-        ]),
-      ]),
-    );
-  }
-
-  String _label(int pwr) {
-    if (pwr >= 145) return 'Legendary 👑';
-    if (pwr >= 130) return 'Epic 🌟';
-    if (pwr >= 120) return 'Super ⚡';
-    if (pwr >= 110) return 'Strong 💪';
-    if (pwr >= 90)  return 'Solid 📊';
-    return 'Growing 🌱';
-  }
-}
-
-class _PowerBar extends StatelessWidget {
-  final int power;
-  const _PowerBar({required this.power});
-  @override
-  Widget build(BuildContext context) {
-    final pct = ((power - 80) / 80.0).clamp(0.0, 1.0);
-    return SizedBox(width: 64, height: 10, child: Stack(children: [
-      Container(decoration: BoxDecoration(
-          color: AppTheme.bg3, borderRadius: BorderRadius.circular(5))),
-      FractionallySizedBox(widthFactor: pct, child: Container(
-          decoration: BoxDecoration(
-              color: AppTheme.yellowLight,
-              borderRadius: BorderRadius.circular(5)))),
-    ]));
-  }
-}
-
-// ── Stat tile ─────────────────────────────────────────────────────────────────
-class _Stat extends StatelessWidget {
-  final String value, label;
-  final Color color;
-  const _Stat(this.value, this.label, this.color);
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.08),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: color.withOpacity(0.25)),
-    ),
-    child: Column(children: [
-      Text(value, style: AppTheme.display(26, color: color)),
-      Text(label.toUpperCase(), style: AppTheme.body(9, color: AppTheme.textSecondary),
-          textAlign: TextAlign.center, maxLines: 2),
-    ]),
-  );
-}
-
-// ── Skill breakdown ────────────────────────────────────────────────────────────
-class _SkillBreakdown extends StatelessWidget {
-  final Progress prog;
-  const _SkillBreakdown({required this.prog});
-
-  @override
-  Widget build(BuildContext context) {
-    final total = prog.additionCorrect + prog.subtractionCorrect +
-        prog.multiplicationCorrect + prog.divisionCorrect;
-    if (total == 0) return const SizedBox.shrink();
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.bg2, borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.bg3)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('SKILL BREAKDOWN', style: AppTheme.body(10,
-            color: AppTheme.textSecondary, weight: FontWeight.w900)),
-        const SizedBox(height: 10),
-        _Bar('➕ Addition',       prog.additionCorrect,       total, AppTheme.green),
-        _Bar('➖ Subtraction',    prog.subtractionCorrect,    total, AppTheme.blue),
-        _Bar('✖️ Multiplication', prog.multiplicationCorrect, total, AppTheme.purple),
-        _Bar('➗ Division',       prog.divisionCorrect,       total, AppTheme.red),
-      ]),
     );
   }
 }
 
-class _Bar extends StatelessWidget {
+// ── UI Helpers ──
+
+class _AnimatedStar extends StatelessWidget {
+  final bool visible;
+  final int delayMs;
+
+  const _AnimatedStar({required this.visible, required this.delayMs});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: visible ? 1.0 : 0.0),
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Dark background placeholder slot
+              const Icon(Icons.star, size: 70, color: Color(0xFF2C3E50)),
+              // The golden star
+              if (visible)
+                Icon(Icons.star, size: 70, color: AppTheme.yellow, shadows: [
+                  Shadow(color: AppTheme.yellowLight.withOpacity(0.5), blurRadius: 15, offset: const Offset(0, 4))
+                ]),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ConfettiBurst extends StatelessWidget {
+  const _ConfettiBurst();
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.5, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.elasticOut,
+      builder: (context, scale, child) {
+        return Transform.scale(
+          scale: scale,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.green,
+              borderRadius: BorderRadius.circular(50),
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: Text('🎉 NEW RECORD! 🎉', style: AppTheme.body(14, color: Colors.white, weight: FontWeight.w900)),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StatRow extends StatelessWidget {
   final String label;
-  final int val, total;
-  final Color color;
-  const _Bar(this.label, this.val, this.total, this.color);
-  @override
-  Widget build(BuildContext context) {
-    final pct = total == 0 ? 0.0 : (val / total).clamp(0.0, 1.0);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(children: [
-        SizedBox(width: 116, child: Text(label,
-            style: AppTheme.body(11, color: AppTheme.textSecondary))),
-        Expanded(child: Stack(children: [
-          Container(height: 8, decoration: BoxDecoration(
-              color: AppTheme.bg3, borderRadius: BorderRadius.circular(4))),
-          FractionallySizedBox(widthFactor: pct, child: Container(
-              height: 8, decoration: BoxDecoration(
-                  color: color, borderRadius: BorderRadius.circular(4)))),
-        ])),
-        const SizedBox(width: 8),
-        Text('$val', style: AppTheme.body(11, color: color, weight: FontWeight.w800)),
-      ]),
-    );
-  }
-}
+  final String value;
+  final Color? valueColor;
 
-// ── Share card ────────────────────────────────────────────────────────────────
-class _ShareCard extends StatelessWidget {
-  final MatchOutcome outcome;
-  final int power, score, streak, cpm;
-  final String accPct, playerName, countryCode;
-
-  const _ShareCard({
-    required this.outcome, required this.power, required this.accPct,
-    required this.score, required this.streak, required this.cpm,
-    required this.playerName, required this.countryCode,
-  });
-
-  String get _text {
-    final res = outcome == MatchOutcome.win ? 'WON 🏆'
-              : outcome == MatchOutcome.lose ? 'lost 😅' : 'drew 🤝';
-    final flag = _flag(countryCode);
-    return '''🎯 Tug of War: Mathematics
-━━━━━━━━━━━━━━━━
-$flag $playerName just $res vs CPU!
-🧠 Brain Power: $power (${_powerLabel(power)})
-📊 Score:    $score
-✅ Accuracy: $accPct
-⚡ Speed:    $cpm Q/min
-🔥 Streak:   $streak
-━━━━━━━━━━━━━━━━
-Can you beat me? 👉 tugofwar.math 🎮''';
-  }
+  const _StatRow({required this.label, required this.value, this.valueColor});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.bg2, borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.bg3)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Text('📤', style: TextStyle(fontSize: 18)),
-          const SizedBox(width: 8),
-          Text('Share Your Result',
-              style: AppTheme.body(14, weight: FontWeight.w800)),
-        ]),
-        const SizedBox(height: 12),
-
-        // Preview
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppTheme.bg, borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppTheme.bg3)),
-          child: Text(_text,
-              style: AppTheme.body(11, color: AppTheme.textSecondary)),
-        ),
-        const SizedBox(height: 12),
-
-        // Share buttons
-        Row(children: [
-          Expanded(child: _Btn('📋', 'Copy',     AppTheme.blue,             () => _copy(context))),
-          const SizedBox(width: 8),
-          Expanded(child: _Btn('💬', 'WhatsApp', const Color(0xFF25D366),   () => _via(context, 'WhatsApp'))),
-          const SizedBox(width: 8),
-          Expanded(child: _Btn('🐦', 'Twitter',  const Color(0xFF1DA1F2),   () => _via(context, 'Twitter'))),
-          const SizedBox(width: 8),
-          Expanded(child: _Btn('📱', 'More',     AppTheme.purple,           () => _via(context, 'other'))),
-        ]),
-      ]),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTheme.body(18, color: AppTheme.textSecondary)),
+        Text(value, style: AppTheme.display(24, color: valueColor ?? AppTheme.textPrimary)),
+      ],
     );
   }
-
-  void _copy(BuildContext ctx) {
-    Clipboard.setData(ClipboardData(text: _text));
-    _snack(ctx, 'Copied to clipboard! Paste anywhere 📋', AppTheme.blue);
-  }
-
-  void _via(BuildContext ctx, String platform) {
-    Clipboard.setData(ClipboardData(text: _text));
-    _snack(ctx, 'Copied! Open $platform and paste to share 📤', AppTheme.purple);
-  }
-
-  void _snack(BuildContext ctx, String msg, Color col) {
-    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-      content: Text(msg, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-      backgroundColor: col,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
-      duration: const Duration(seconds: 3),
-    ));
-  }
-
-  String _flag(String code) {
-    if (code.length != 2) return '🌍';
-    final b = 0x1F1E6 - 65;
-    final c = code.toUpperCase().codeUnits;
-    return String.fromCharCode(b + c[0]) + String.fromCharCode(b + c[1]);
-  }
-
-  String _powerLabel(int pwr) {
-    if (pwr >= 145) return 'Legendary';
-    if (pwr >= 130) return 'Epic';
-    if (pwr >= 120) return 'Super';
-    if (pwr >= 110) return 'Strong';
-    if (pwr >= 90)  return 'Solid';
-    return 'Growing';
-  }
-}
-
-class _Btn extends StatelessWidget {
-  final String icon, label;
-  final Color color;
-  final VoidCallback onTap;
-  const _Btn(this.icon, this.label, this.color, this.onTap);
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.4))),
-      child: Column(children: [
-        Text(icon, style: const TextStyle(fontSize: 20)),
-        const SizedBox(height: 2),
-        Text(label, style: AppTheme.body(9, color: color, weight: FontWeight.w800),
-            textAlign: TextAlign.center),
-      ]),
-    ),
-  );
 }

@@ -85,6 +85,8 @@ class GameSession {
   final bool active;
   final bool paused;
   final int coinsEarned;
+  final int starsEarned; // UC-009
+  final bool isNewRecord; // UC-009
   final AiState aiState;
   final bool playerAnsweredCorrect;
   final bool playerAnsweredWrong;
@@ -105,6 +107,8 @@ class GameSession {
     this.active = false,
     this.paused = false,
     this.coinsEarned = 0,
+    this.starsEarned = 0,
+    this.isNewRecord = false,
     this.aiState = const AiState(),
     this.playerAnsweredCorrect = false,
     this.playerAnsweredWrong = false,
@@ -115,8 +119,8 @@ class GameSession {
     int? sessionCorrect, int? sessionAnswered, double? ropePosition,
     MathQuestion? playerQuestion, MathQuestion? aiQuestion,
     String? currentInput, int? timeLeft, int? questionTimeLeft,
-    bool? active, bool? paused, int? coinsEarned, AiState? aiState,
-    bool? playerAnsweredCorrect, bool? playerAnsweredWrong,
+    bool? active, bool? paused, int? coinsEarned, int? starsEarned, bool? isNewRecord,
+    AiState? aiState, bool? playerAnsweredCorrect, bool? playerAnsweredWrong,
   }) => GameSession(
     playerScore: playerScore ?? this.playerScore,
     aiScore: aiScore ?? this.aiScore,
@@ -133,6 +137,8 @@ class GameSession {
     active: active ?? this.active,
     paused: paused ?? this.paused,
     coinsEarned: coinsEarned ?? this.coinsEarned,
+    starsEarned: starsEarned ?? this.starsEarned,
+    isNewRecord: isNewRecord ?? this.isNewRecord,
     aiState: aiState ?? this.aiState,
     playerAnsweredCorrect: playerAnsweredCorrect ?? this.playerAnsweredCorrect,
     playerAnsweredWrong: playerAnsweredWrong ?? this.playerAnsweredWrong,
@@ -230,9 +236,10 @@ class Progress {
   int totalResponseTimeMs;
   int totalQuestionsAnswered;
   
-  // NEW FIELDS FOR DAILY QUESTS
+  // NEW FIELDS FOR DAILY QUESTS AND ADVENTURE STARS
   List<DailyQuest> dailyQuests;
   DateTime? lastQuestDate;
+  Map<String, int> adventureStars; // e.g. {'additionOnly_1': 3}
 
   Progress({
     this.coins = 0,
@@ -254,6 +261,7 @@ class Progress {
     this.totalQuestionsAnswered = 0,
     this.dailyQuests = const [],
     this.lastQuestDate,
+    this.adventureStars = const {},
   });
 }
 
@@ -305,69 +313,45 @@ class LeaderboardEntry {
   double accuracy;
   int brainPower;
   DateTime date;
-  bool isCurrentUser; // Prevents duplicate entries
+  bool isCurrentUser; 
 
   LeaderboardEntry({
-    required this.playerName,
-    required this.countryCode,
-    required this.score,
-    required this.accuracy,
-    required this.brainPower,
-    required this.date,
+    required this.playerName, required this.countryCode, required this.score,
+    required this.accuracy, required this.brainPower, required this.date,
     this.isCurrentUser = false,
   });
 
   Map<String, dynamic> toJson() => {
-    'playerName': playerName, 'countryCode': countryCode,
-    'score': score, 'accuracy': accuracy,
-    'brainPower': brainPower, 'date': date.toIso8601String(),
+    'playerName': playerName, 'countryCode': countryCode, 'score': score, 
+    'accuracy': accuracy, 'brainPower': brainPower, 'date': date.toIso8601String(),
     'isCurrentUser': isCurrentUser,
   };
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> j) => LeaderboardEntry(
-    playerName: j['playerName'] ?? 'Player',
-    countryCode: j['countryCode'] ?? 'US',
-    score: j['score'] ?? 0,
-    accuracy: (j['accuracy'] ?? 0.0).toDouble(),
+    playerName: j['playerName'] ?? 'Player', countryCode: j['countryCode'] ?? 'US',
+    score: j['score'] ?? 0, accuracy: (j['accuracy'] ?? 0.0).toDouble(),
     brainPower: j['brainPower'] ?? j['iqScore'] ?? 100, 
     date: DateTime.tryParse(j['date'] ?? '') ?? DateTime.now(),
     isCurrentUser: j['isCurrentUser'] ?? false,
   );
 }
 
-// ── NEW DATA MODEL: DAILY QUESTS ───────────────────────────────
 class DailyQuest {
-  final String id;
-  final String title;
-  final int target;
-  int current;
-  final int reward;
-  bool isClaimed;
+  final String id; final String title; final int target;
+  int current; final int reward; bool isClaimed;
 
   DailyQuest({
-    required this.id,
-    required this.title,
-    required this.target,
-    this.current = 0,
-    required this.reward,
-    this.isClaimed = false,
+    required this.id, required this.title, required this.target,
+    this.current = 0, required this.reward, this.isClaimed = false,
   });
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'target': target,
-    'current': current,
-    'reward': reward,
-    'isClaimed': isClaimed,
+    'id': id, 'title': title, 'target': target, 'current': current,
+    'reward': reward, 'isClaimed': isClaimed,
   };
 
   factory DailyQuest.fromJson(Map<String, dynamic> json) => DailyQuest(
-    id: json['id'],
-    title: json['title'],
-    target: json['target'],
-    current: json['current'] ?? 0,
-    reward: json['reward'],
-    isClaimed: json['isClaimed'] ?? false,
+    id: json['id'], title: json['title'], target: json['target'],
+    current: json['current'] ?? 0, reward: json['reward'], isClaimed: json['isClaimed'] ?? false,
   );
 }

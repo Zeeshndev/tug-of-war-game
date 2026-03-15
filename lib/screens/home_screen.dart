@@ -189,12 +189,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with TickerProviderStat
                         child: child,
                       ),
                       child: BigButton(
-                        label: '🗺️ ADVENTURE',
-                        onTap: () => context.push('/adventure'),
-                        color: AppTheme.blue,
-                        shadowColor: const Color(0xFF1D4ED8), 
-                        fontSize: 26,
-                      ),
+  label: 'Adventure Map',
+  onTap: () => context.go('/adventure'), // <-- Add this navigation!
+  color: AppTheme.blue,
+  shadowColor: const Color(0xFF1E3A8A),
+),
                     ),
                     const SizedBox(height: 12),
                     GhostButton(
